@@ -6,6 +6,8 @@ jobs:
   build_ubuntu_gcc:
 
     runs-on: ${{ matrix.os }}
+    env:
+      LOCAL_INSTALL_DIR: ${{ github.workspace }}/.local
     strategy:
       fail-fast: false
       matrix:
@@ -16,13 +18,60 @@ jobs:
         with:
           path: vm-manager
 
+      - uses: actions/checkout@v2
+        with:
+          repository: grpc/grpc
+          path: grpc
+          ref: v1.43.0
+          submodules: recursive
+
       - name: setup
         run: |
           sudo apt-get --quiet update --yes
-          sudo apt-get --quiet install --yes make libglib2.0-dev libncurses-dev libuuid1 uuid-dev libjson-c-dev devscripts build-essential lintian debhelper
+          sudo apt-get --quiet install --yes make libglib2.0-dev libncurses-dev libuuid1 uuid-dev libjson-c-dev devscripts lintian debhelper
+          sudo apt-get --quiet install --yes autoconf libtool pkg-config
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          gcc --version
+          cmake --version
+
+      - name: install_grpc
+        run: |
+          mkdir ${{ env.LOCAL_INSTALL_DIR }}
+          export PATH="${{ env.LOCAL_INSTALL_DIR }}/bin:$PATH"
+
+          #Patching
+          cd grpc/
+          git am -3 ${{ github.workspace }}/vm-manager/external/patches/grpc/*.patch
+          cd -
+
+          #Build and install gRPC
+          mkdir -p grpc/cmake/build
+          pushd grpc/cmake/build
+          cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TEST=OFF -DCMAKE_INSTALL_PREFIX=${{ env.LOCAL_INSTALL_DIR }} ../..
+          make -j4
+          make install
+          popd
+
+          #Build and install abseil-cpp
+          mkdir -p grpc/third_party/abseil-cpp/cmake/build
+          pushd grpc/third_party/abseil-cpp/cmake/build
+          cmake -DCMAKE_INSTALL_PREFIX=${{ env.LOCAL_INSTALL_DIR }} -DCMAKE_POSITION_INDEPENDENT=TRUE ../..
+          make -j4
+          make install
+          popd
+
+      - name: build_grpc_example
+        run: |
+          export PATH="${{ env.LOCAL_INSTALL_DIR }}/bin:$PATH"
+          mkdir -p grpc/examples/cpp/helloworld/cmake/build
+          pushd grpc/examples/cpp/helloworld/cmake/build
+          cmake -DCMAKE_PREFIX_PATH=${{ env.LOCAL_INSTALL_DIR }} ../..
+          make -j4
 
       - name: build
         run: |
+          export PATH="${{ env.LOCAL_INSTALL_DIR }}/bin:$PATH"
           cd vm-manager/
           debuild -b -uc -us --lintian-opts --profile debian
 
@@ -31,7 +80,9 @@ jobs:
         with:
           name: vm-manager.${{ matrix.os }}.${{ github.run_id }}.${{ github.sha }}
           path: |
-            debian/
+            ${{ github.workspace }}/grpc/examples/cpp/helloworld/cmake/build/
+            ${{ github.workspace }}/grpc/examples/cpp/helloworld/cmake/build/
+            ${{ github.workspace }}/vm-manager/debian/
             *.deb
             *.ddeb
             *.build
