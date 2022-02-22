@@ -1,21 +1,46 @@
 
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/ini_parser.hpp>
-namespace pt = boost::property_tree;
+/*
+ * Copyright (c) 2022 Intel Corporation.
+ * All rights reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ */
+#include "vm_builder.h"
+#include "vm_manager.h"
+#include "config_parser.h"
+#include "log.h"
 
-#include <assert.h>
-#include <iostream>
-#include <sstream>
-#include <fstream>
-using namespace std;
+namespace vm_manager {
 
-#if 0
-class vm_builder {
-    public:
-        virtual vm_builder(string fp);
-        virtual ~vm_builder();
-        virtual string build_vm_args();
-    private:
-        string file;
+bool VmBuilder::BuildQemuVmArgs()
+{
+    LOG(info) << "build qemu vm args";
+    return false;
 }
-#endif
+
+bool VmBuilder::BuildVmArgs()
+{
+    if (cfg_.GetValue(kGroupEmul, kEmulType) == kEmulTypeQemu) {
+        return BuildQemuVmArgs();
+    } else {
+        /* Default try to build args for QEMU */
+        return BuildQemuVmArgs();
+    }
+    return false;
+}
+
+void VmBuilder::StartVm()
+{
+    LOG(info) << "Emulator command:" << emul_cmd_;
+}
+
+VmBuilder::VmBuilder(string name)
+{
+    LOG(info) << "Config file path:" << GetConfigPath()  << string("/") << name << ".ini";
+    if (!cfg_.ReadConfigFile(GetConfigPath() + string("/") + name + ".ini")) {
+        LOG(error) << "Failed to read config file";
+    }
+}
+
+}  // vm_manager

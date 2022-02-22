@@ -45,7 +45,7 @@ vector<string> parse_file(const char *file, po::options_description &opts, po::v
     //}
 
 }
-
+#if 0
 static map<string, vector<string>> keys_global = {
     { "name",          {}},
     { "flashfiles",    {}},
@@ -150,6 +150,7 @@ static map<string, map<string, vector<string>>> civ_mopts = {
     { "guest_control", keys_guest_control },
     { "extra",         keys_extra },
 };
+#endif
 
 int parse_file_ptree(const char *file)
 {
@@ -332,4 +333,3 @@ int parse_ini_file(const char *file)
     }
 
 }
-

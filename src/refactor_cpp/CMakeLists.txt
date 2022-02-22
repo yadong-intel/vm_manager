@@ -34,13 +34,13 @@ include_directories(${DEPS_INCS_INCLUDE_DIRS})
 #set(CMAKE_INCLUDE_CURRENT_DIR ON)
 include_directories(include include/guest)
 
-find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(Boost REQUIRED COMPONENTS program_options log log_setup)
 #find_package(Boost)
 include_directories(${Boost_INCLUDE_DIR})
 
 file(GLOB guest_src guest/*.cc)
 
-add_executable(${PROJECT_NAME} vm_manager.cc utils.cc ${guest_src})
+add_executable(${PROJECT_NAME} vm_manager.cc ${guest_src})
 target_link_libraries(${PROJECT_NAME}
   PRIVATE ftxui::screen
   PRIVATE ftxui::dom
@@ -49,5 +49,5 @@ target_link_libraries(${PROJECT_NAME}
   ${Boost_LIBRARIES}
 )
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)

@@ -5,22 +5,17 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  */
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <limits.h>
-#include <getopt.h>
-#include <string.h>
-#include <dirent.h>
-#include <fcntl.h>
+
 #include <pwd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <iostream>
+#include <filesystem>
+#include <map>
+
 #include "vm_manager.h"
+#include "log.h"
+#include "guest/vm_builder.h"
 #include "guest/tui.h"
-using namespace std;
+#include "guest/vm_interface.h"
 
 #define VERSION_MAJOR 0
 #define VERSION_MINOR 4
@@ -28,76 +23,135 @@ using namespace std;
 
 #define VERSION xstr(VERSION_MAJOR) "." xstr(VERSION_MINOR) "." xstr(VERSION_MICRO)
 
-char civ_config_path[MAX_PATH] = { 0 };
+namespace vm_manager {
+namespace po = boost::program_options;
 
-static void help(int exit_err)
-{
-	fprintf(stderr,
-		"Usage:\n"
-		"\tvm-manager [-c] [-i config_file_path] [-d vm_name] [-b vm_name] [-q vm_name] [-f vm_name] [-u vm_name] [-l] [-v] [-h]\n"
-		"Options:\n"
-		"\t-c, --create\n"
-		"\t\tCreate a new CiV guest\n"
-		"\t-i, --import\n"
-		"\t\tImport a CiV guest from existing config file\n"
-		"\t-d, --delete\n"
-		"\t\tDelete a CiV guest\n"
-		"\t-b, --start\n"
-		"\t\tStart a CiV guest\n"
-		"\t-q, --stop\n"
-		"\t\tStop a CiV guest\n"
-		"\t-f, --flash\n"
-		"\t\tFlash a CiV guest\n"
-		"\t-u, --update\n"
-		"\t\tUpdate an existing CiV guest\n"
-		"\t-l, --list\n"
-		"\t\tList existing CiV guest\n"
-		"\t-v, --version\n"
-		"\t\tShow CiV vm-manager version \n"
-		"\t-h, --help\n"
-		"\t\tShow this help message\n"
-	);
-
-	if (exit_err)
-		exit(EXIT_FAILURE);
+CivOptions::CivOptions() {
+    cmdline_options.add_options()
+		("help,h",    "Show ths help message")
+		("create,c",  "Create a new CiV guest")
+		("import,i",  po::value<std::string>(), "Import a CiV guest from existing config file")
+		("delete,d",  po::value<std::string>(), "Delete a CiV guest")
+		("start,b",   po::value<std::string>(), "Start a CiV guest")
+		("stop,q",    po::value<std::string>(), "Stop a CiV guest")
+		("flash,f",   po::value<std::string>(), "Flash a CiV guest")
+		("update,u",  po::value<std::string>(), "Update an existing CiV guest")
+		("list,l",    "List existing CiV guest")
+		("version,v", "Show CiV vm-manager version")
+	;
 }
 
-static int setup_work_dir(void)
+void CivOptions::ParseOptions(int argc, char* argv[]) {
+	po::store(po::command_line_parser(argc, argv).options(cmdline_options).run(), vm);
+	po::notify(vm);
+
+	if (vm.empty()) {
+		PrintHelp();
+		return;
+	}
+
+	if (vm.count("help")) {
+		PrintHelp();
+		return;
+	}
+
+	if (vm.count("create")) {
+		return;
+	}
+
+	if (vm.count("import")) {
+		return;
+	}
+
+	if (vm.count("delete")) {
+		return;
+	}
+
+	if (vm.count("start")) {
+		LOG(info) << "Start guest " << vm["start"].as<std::string>();
+		StartVm(vm["start"].as<std::string>());
+		return;
+	}
+
+	if (vm.count("stop")) {
+		return;
+	}
+
+	if (vm.count("flash")) {
+		return;
+	}
+
+	if (vm.count("update")) {
+		return;
+	}
+
+	if (vm.count("list")) {
+		return;
+	}
+
+	if (vm.count("version")) {
+		PrintVersion();
+		return;
+	}
+}
+
+void CivOptions::PrintHelp(void) {
+	std::cout << "Usage:\n";
+	std::cout << "  vm-manager [-c] [-i config_file_path] [-d vm_name] [-b vm_name] [-q vm_name] [-f vm_name] [-u vm_name] [-l] [-v] [-h]\n";
+	std::cout << "Options:\n";
+	std::cout << cmdline_options << std::endl;
+}
+
+void CivOptions::PrintVersion(void) {
+	std::cout << "CiV vm-manager version: " << VERSION << std::endl;
+}
+
+}  // namespace vm_manager
+
+static string civ_config_path;
+string GetConfigPath(void) {
+	return civ_config_path;
+}
+
+static int SetupConfigPath(void)
 {
-	struct stat st;
-	pid_t pid;
-	int ret;
-	int wstatus;
-	char *suid = NULL;
-	int real_uid;
+	int ret = 0;
+	char *sudo_uid = NULL;
+	char *sudo_gid = NULL;
+	uid_t ruid, euid, suid;
+	gid_t rgid, egid, sgid;
 
-	suid = getenv("SUDO_UID");
+    getresuid(&ruid, &euid, &suid);
+	getresgid(&rgid, &egid, &sgid);
+    suid = geteuid();
+	sgid = getegid();
 
-	if (suid) {
-		real_uid = atoi(suid);
-	} else {
-		real_uid = getuid();
+	sudo_uid = std::getenv("SUDO_UID");
+	sudo_gid = std::getenv("SUDO_GID");
+
+	if (sudo_gid) {
+		egid = atoi(sudo_gid);
+		setresgid(rgid, egid, sgid);
 	}
 
-	snprintf(civ_config_path, MAX_PATH, "%s/.intel/.civ", getpwuid(real_uid)->pw_dir);
-	if (stat(civ_config_path, &st) != 0) {
-		pid = fork();
-		if (pid == 0) {
-			ret = execl("/bin/mkdir", "mkdir", "-p", civ_config_path, NULL);
-			if (ret == -1) {
-				fprintf(stderr, "Failed to execute 'mkdir -p %s'\n", civ_config_path);
-				exit(EXIT_FAILURE);
-			}
-		} else if (pid < 0) {
-			fprintf(stderr, "Failed to fork child process to create work dir!\n");
-		} else {
-			waitpid(pid, &wstatus, 0);
-			if (WEXITSTATUS(wstatus) == EXIT_FAILURE)
-				return -1;
-		}
+	if (sudo_uid) {
+		euid = atoi(sudo_gid);
+		setresuid(ruid, euid, suid);
 	}
 
-	return 0;
+    civ_config_path = string(getpwuid(euid)->pw_dir) + "/.intel/.civ";
+    if (!std::filesystem::exists(civ_config_path)) {
+        if (!std::filesystem::create_directories(civ_config_path))
+		    ret = -1;
+	}
+
+	if (sudo_gid)
+		setresgid(rgid, sgid, egid);
+
+	if (sudo_uid)
+		setresuid(ruid, suid, euid);
+
+	return ret;
 }
 
 int main(int argc, char *argv[])
@@ -105,85 +159,14 @@ int main(int argc, char *argv[])
 	int c;
 	int ret = 0;
 
-	//if (setup_work_dir() != 0)
-	//	return -1;
+    logger::init();
+
+	if (SetupConfigPath() != 0)
+		return -1;
 
 	//set_cleanup();
-
-	while (1) {
-		int option_index = 0;
-		static struct option long_options[] = {
-			{ "create",  no_argument,       0, 'c' },
-			{ "import",  required_argument, 0, 'i' },
-			{ "delete",  required_argument, 0, 'd' },
-			{ "start",   required_argument, 0, 'b' },
-			{ "stop",    required_argument, 0, 'q' },
-			{ "flash",   required_argument, 0, 'f' },
-			{ "update",  required_argument, 0, 'u' },
-			{ "list",    no_argument,       0, 'l' },
-			{ "version", no_argument,       0, 'v' },
-			{ "help",    no_argument,       0, 'h' },
-			{ 0, 0, 0, 0 }
-		};
-
-		c = getopt_long(argc, argv, "ci:d:b:q:f:u:lvh", long_options, &option_index);
-		if (c == -1)
-			break;
-
-		switch (c) {
-		case 'c': {
-			printf("create guest\n");
-			//ret = create_tui();
-			civ_tui ct;
-			ct.initialize_ui();
-			//ret = create_guest(NULL);
-			break;
-		}
-		case 'i':
-			printf("import guest from ini file: %s\n", optarg);
-			ret = parse_ini_file(optarg);
-			//ret = import_guest(optarg);
-			break;
-		case 'd':
-			printf("remove guest: %s\n", optarg);
-			//ret = delete_guest(optarg);
-			break;
-		case 'b':
-			printf("start guest %s\n", optarg);
-			//set_cleanup();
-			//ret = start_guest(optarg);
-			fprintf(stderr, "Exiting.");
-			break;
-		case 'q':
-			printf("stop guest %s\n", optarg);
-			//ret = stop_guest(optarg);
-			break;
-		case 'f':
-			printf("flash guest %s\n", optarg);
-			//ret = flash_guest(optarg);
-			break;
-		case 'u':
-			printf("update guest %s\n", optarg);
-			//ret = create_guest(optarg);
-			break;
-		case 'l':
-			//list_guests();
-			break;
-		case 'v':
-			printf("CiV vm-manager version: %s\n", VERSION);
-			break;
-		case 'h':
-			help(0);
-			break;
-
-		default:
-			help(1);
-			break;
-		}
-	}
-
-	if (optind < argc || argc == 1)
-		help(1);
+	vm_manager::CivOptions co;
+	co.ParseOptions(argc, argv);
 
 	return ret;
 }

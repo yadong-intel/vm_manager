@@ -8,30 +8,39 @@
 #ifndef __VM_MANAGER_H__
 #define __VM_MANAGER_H__
 
+#include <boost/program_options.hpp>
+
 #define CIV_GUEST_QMP_SUFFIX     ".qmp.unix.socket"
-#define MAX_CMDLINE_LEN 4096U
 
 #ifndef MAX_PATH
 #define MAX_PATH 2048U
 #endif
 
-#define str(s) #s
-#define xstr(s) str(s)
+#define vstr(s) #s
+#define xstr(s) vstr(s)
 
-extern char civ_config_path[];
+namespace vm_manager {
 
-int create_guest(char *name);
-#if 0
-int import_guest(char *path);
-int start_guest(char *name);
-int flash_guest(char *name);
-void list_guests(void);
-int stop_guest(char *name);
-int delete_guest(char *name);
+class CivOptions final {
 
-void set_cleanup();
-#endif
+public:
+    CivOptions();
 
-int parse_ini_file(const char *);
+	CivOptions(CivOptions &) = delete;
+	CivOptions& operator=(const CivOptions &) = delete;
+
+    void ParseOptions(int argc, char* argv[]);
+
+private:
+    void PrintHelp(void);
+	void PrintVersion(void);
+
+    boost::program_options::options_description cmdline_options;
+	boost::program_options::variables_map vm;
+};
+
+} //  namespace vm_manager
+
+std::string GetConfigPath(void);
 
 #endif /* __VM_MANAGER_H__*/

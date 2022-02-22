@@ -1,5 +1,6 @@
 
 #include "tui.h"
+#include "vm_manager.h"
 #include "config_parser.h"
 
 #include <boost/process.hpp>
@@ -118,7 +119,7 @@ void civ_tui::initialize_form(void)
     _form->Add(_fastboot_port.wrap);
 
     /* Field: firmware */
-    _firmware_type = { FIRM_OPTS_UNIFIED_STR, FIRM_OPTS_SPLITED_STR };
+    _firmware_type = { vm_manager::kFirmUnified, vm_manager::kFirmSplited };
     _firm_toggle_option = ToggleOption();
     _firm_toggle_option.style_selected = Decorator(bold) | inverted;
     _firm_unified.input = Input(&_firm_unified.content, "Unified firmware binary path");
@@ -149,10 +150,11 @@ void civ_tui::initialize_form(void)
     _form->Add(_cfirm);
 
     /* Field: virtual GPU */
-    _vgpu_type = { VGPU_OPTS_NONE_STR, VGPU_OPTS_VIRTIO_STR, VGPU_OPTS_RAMFB_STR, VGPU_OPTS_GVTG_STR, VGPU_OPTS_GVTD_STR };
+    //_vgpu_type = { VGPU_OPTS_NONE_STR, VGPU_OPTS_VIRTIO_STR, VGPU_OPTS_RAMFB_STR, VGPU_OPTS_GVTG_STR, VGPU_OPTS_GVTD_STR };
+    _vgpu_type = { vm_manager::kVgpuNone, vm_manager::kVgpuVirtio, vm_manager::kVgpuRamfb, vm_manager::kVgpuGvtG, vm_manager::kVgpuGvtD };
     _cvgpu_type = Dropdown(&_vgpu_type, &_vgpu_selected);
 
-    _gvtg_ver = {GVTG_OPTS_V5_1_STR, GVTG_OPTS_V5_2_STR, GVTG_OPTS_V5_4_STR,GVTG_OPTS_V5_8_STR};
+    _gvtg_ver = { vm_manager::kGvtgV51, vm_manager::kGvtgV52, vm_manager::kGvtgV54, vm_manager::kGvtgV58 };
     init_input_field_hbox(_gvtg_uuid, "uuid", "UUID for a GVTg-VGPU");
     _cgvtg_sub = Container::Vertical({Dropdown(&_gvtg_ver, &_gvtg_ver_selected), _gvtg_uuid.wrap});
 
