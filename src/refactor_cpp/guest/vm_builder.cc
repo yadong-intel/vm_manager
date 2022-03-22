@@ -13,14 +13,12 @@
 
 namespace vm_manager {
 
-bool VmBuilder::BuildQemuVmArgs()
-{
+bool VmBuilder::BuildQemuVmArgs() {
     LOG(info) << "build qemu vm args";
     return false;
 }
 
-bool VmBuilder::BuildVmArgs()
-{
+bool VmBuilder::BuildVmArgs() {
     if (cfg_.GetValue(kGroupEmul, kEmulType) == kEmulTypeQemu) {
         return BuildQemuVmArgs();
     } else {
@@ -30,13 +28,11 @@ bool VmBuilder::BuildVmArgs()
     return false;
 }
 
-void VmBuilder::StartVm()
-{
+void VmBuilder::StartVm() {
     LOG(info) << "Emulator command:" << emul_cmd_;
 }
 
-VmBuilder::VmBuilder(string name)
-{
+VmBuilder::VmBuilder(string name) {
     LOG(info) << "Config file path:" << GetConfigPath()  << string("/") << name << ".ini";
     if (!cfg_.ReadConfigFile(GetConfigPath() + string("/") + name + ".ini")) {
         LOG(error) << "Failed to read config file";

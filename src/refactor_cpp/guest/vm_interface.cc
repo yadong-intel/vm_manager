@@ -13,13 +13,7 @@ namespace vm_manager {
 
 int ShutdownVm(string name)
 {
-    VmBuilder vb(name);
-    if (vb.BuildVmArgs()) {
-        vb.StartVm();
-    } else {
-        LOG(error) << "Failed to build args";
-        return -1;
-    }
+    // Shutdown VM
     return 0;
 }
 

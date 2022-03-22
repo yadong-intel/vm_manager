@@ -17,7 +17,7 @@
 namespace vm_manager {
 
 using std::string;
-int StartGuest(string name);
+//int StartGuest(string name);
 
 class VmBuilder {
     public:

@@ -39,8 +39,10 @@ private:
 	boost::program_options::variables_map vm;
 };
 
+//bool IsServerRunning(void);
+
 } //  namespace vm_manager
 
-std::string GetConfigPath(void);
+const char *GetConfigPath(void);
 
 #endif /* __VM_MANAGER_H__*/
