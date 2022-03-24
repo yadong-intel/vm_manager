@@ -1,0 +1,16 @@
+//
+// Copyright (c) 2022 Intel Corporation.
+// All rights reserved.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package StartupListener;
+
+message EmptyMessage {}
+
+// The Startup Listener service definition.
+service StartupListener {
+  rpc VmReady (EmptyMessage) returns (EmptyMessage) {}
+}
