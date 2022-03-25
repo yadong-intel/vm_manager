@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2020 Intel Corporation.
+# Copyright (c) 2022 Intel Corporation.
 # All rights reserved.
 #
 # SPDX-License-Identifier: Apache-2.0
@@ -38,6 +38,7 @@ ExternalProject_Add(ep_boost
                   --layout=system
                   --with-program_options
                   --with-log
+                  --with-filesystem
 
     INSTALL_COMMAND ""
     LOG_CONFIGURE 1
@@ -60,7 +61,7 @@ function(add_boost_lib)
 endfunction()
 
 add_boost_lib(thread)
-add_boost_lib(filesystem)
 add_boost_lib(program_options)
 add_boost_lib(log)
 add_boost_lib(log_setup)
+add_boost_lib(filesystem)

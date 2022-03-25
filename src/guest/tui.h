@@ -31,7 +31,7 @@ typedef struct {
 class InputField {
  public:
     InputField(const char *name, const char *hint)
-        :name_(name), hint_(hint) {
+        :name_(name) {
         input_ = ftxui::Input(content_, std::string(hint));
         wrap_ = ftxui::Renderer(input_, RenderInput);
      }
@@ -42,7 +42,6 @@ class InputField {
 
  private:
     const char *name_;
-    const char *hint_;
     ftxui::Component wrap_;
     ftxui::Component input_;
     std::string content_;

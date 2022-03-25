@@ -15,7 +15,7 @@ include(FTXUICMake)
 
 set(PROJECT_NAME "vm-manager")
 project(${PROJECT_NAME})
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-variable")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-variable -Wno-c++11-narrowing")
 
 find_package(PkgConfig REQUIRED)
 include_directories(${DEPS_INCS_INCLUDE_DIRS})
@@ -38,6 +38,10 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE ep_boost::thread
   PRIVATE ep_boost::filesystem
   -lrt
+)
+
+install(TARGETS ${PROJECT_NAME}
+  RUNTIME DESTINATION bin
 )
 
 set(CMAKE_CXX_STANDARD 17)

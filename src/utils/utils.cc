@@ -55,7 +55,7 @@ const char *GetConfigPath(void) {
     snprintf(civ_config_path, MAX_PATH, "%s%s", getpwuid(euid)->pw_dir, "/.intel/.civ");
     if (!std::filesystem::exists(civ_config_path)) {
         if (!std::filesystem::create_directories(civ_config_path)) {
-            free(civ_config_path);
+            delete[] civ_config_path;
             civ_config_path = NULL;
         }
     }

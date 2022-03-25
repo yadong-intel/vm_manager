@@ -25,7 +25,7 @@ void CivTui::InitCompDisk(void) {
 
 void CivTui::InitCompFirm(void) {
     firmware_type_ = { vm_manager::kFirmUnified, vm_manager::kFirmSplited };
-    ftxui::Decorator(ftxui::bold);
+
     cfirm_inner_ = ftxui::Container::Vertical({
         ftxui::Toggle(&firmware_type_, &firmware_type_selected_),
         ftxui::Container::Tab({
