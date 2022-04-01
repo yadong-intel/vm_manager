@@ -9,7 +9,7 @@
 #include <string>
 
 namespace vm_manager {
-int StartVm(std::string name);
+int StartVm(struct StartVmPayload vm_payload);
 int ShutdownVm(std::string name);
 
 }  // namespace vm_manager

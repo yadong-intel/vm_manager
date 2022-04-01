@@ -56,7 +56,7 @@ class session : public std::enable_shared_from_this<session> {
                         stop_server_ = true;
                         break;
                     case kCivMsgStartVm:
-                        StartVm(msg_in_.payload);
+                        StartVm(msg_in_.vm_pay_load);
                         break;
                     case kCivMsgTest:
                         break;

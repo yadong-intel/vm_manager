@@ -19,11 +19,20 @@ enum CivMsgType {
     kCivMsgRespond = 500U,
 };
 
+struct StartVmPayload {
+    char name[64];
+    char env_disp[64];
+    char env_xauth[128];
+};
+
 struct CivMsg {
     enum { MaxPayloadSize = 1024U };
 
     CivMsgType type;
-    char payload[MaxPayloadSize];
+    union {
+        char payload[MaxPayloadSize];
+        struct StartVmPayload vm_pay_load;
+    };
 };
 
 

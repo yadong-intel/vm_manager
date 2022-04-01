@@ -6,6 +6,7 @@
  *
  */
 #include <sys/stat.h>
+#include <sys/syslog.h>
 
 #include <pwd.h>
 #include <unistd.h>
@@ -93,6 +94,7 @@ int Daemonize(void) {
         }
     }
 
+    LOG(info) << "Second forked!";
     umask(0);
     for (int t = sysconf(_SC_OPEN_MAX); t >= 0; t--) {
         close(t);

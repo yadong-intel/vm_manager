@@ -8,6 +8,7 @@
  */
 #include "guest/vm_builder.h"
 #include "guest/config_parser.h"
+#include "services/message.h"
 #include "utils/log.h"
 #include "utils/utils.h"
 
@@ -32,9 +33,9 @@ void VmBuilder::StartVm() {
     LOG(info) << "Emulator command:" << emul_cmd_;
 }
 
-VmBuilder::VmBuilder(std::string name) {
-    LOG(info) << "Config file path:" << GetConfigPath()  << std::string("/") << name << ".ini";
-    if (!cfg_.ReadConfigFile(GetConfigPath() + std::string("/") + name + ".ini")) {
+VmBuilder::VmBuilder(struct StartVmPayload vm_payload) {
+    LOG(info) << "Config file path:" << GetConfigPath()  << std::string("/") << vm_payload.name << ".ini";
+    if (!cfg_.ReadConfigFile(GetConfigPath() + std::string("/") + vm_payload.name + ".ini")) {
         LOG(error) << "Failed to read config file";
     }
 }

@@ -87,6 +87,7 @@ void CivTui::InitCompRpmb(void) {
 
 void CivTui::InitCompPciPt(void) {
     boost::process::ipstream pipe_stream;
+    std::error_code ec;
     boost::process::child c("lspci -D", boost::process::std_out > pipe_stream);
     std::string line;
     while (pipe_stream && std::getline(pipe_stream, line)) {
@@ -97,7 +98,7 @@ void CivTui::InitCompPciPt(void) {
         line.erase();
     }
 
-    c.wait();
+    c.wait(ec);
 
     PtPciClickButton = [&]() {
         pt_pci_disp_.clear();

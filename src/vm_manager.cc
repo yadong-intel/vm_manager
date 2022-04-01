@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  */
-
+#include <sys/syslog.h>
 #include <iostream>
 #include <filesystem>
 #include <map>
@@ -70,7 +70,10 @@ static void StartGuest(std::string name) {
         LOG(error) << "CiV Guest name exceed Max length:" << req.MaxPayloadSize;
         return;
     }
-    strncpy(req.payload, name.c_str(), req.MaxPayloadSize);
+    strncpy(req.vm_pay_load.name, name.c_str(), sizeof(req.vm_pay_load.name));
+    strncpy(req.vm_pay_load.env_disp, getenv("DISPLAY"), sizeof(req.vm_pay_load.env_disp));
+    strncpy(req.vm_pay_load.env_xauth, getenv("XAUTHORITY"), sizeof(req.vm_pay_load.env_xauth));
+
     if (!c.Send(req)) {
         LOG(error) << "Failed Send Start Guest request to server!";
         return;
@@ -109,6 +112,7 @@ static void StartServer(bool daemon) {
             LOG(error) << "vm-manager: failed to Daemonize\n";
             return;
         }
+
         logger::log2file("/tmp/civ_server.log");
         LOG(info) << "\n--------------------- "
                   << "CiV VM Manager Service started in background!"
