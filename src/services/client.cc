@@ -16,7 +16,7 @@ namespace vm_manager {
 
 bool Client::Connect(void) {
     boost::system::error_code ec;
-    sock_.connect(boost::asio::local::stream_protocol::endpoint(server_sock), ec);
+    //sock_.connect(boost::asio::local::stream_protocol::endpoint(server_sock), ec);
     if (ec) {
         LOG(error) << "Failed connect to server: " << ec.message();
         return false;

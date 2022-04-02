@@ -14,7 +14,9 @@
 #include <memory>
 #include <filesystem>
 
-#include <boost/asio.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/interprocess/sync/scoped_lock.hpp>
 
 #include "services/server.h"
 #include "services/message.h"
@@ -24,121 +26,56 @@
 
 namespace vm_manager {
 
-class session : public std::enable_shared_from_this<session> {
- public:
-    explicit session(boost::asio::local::stream_protocol::socket sock)
-        : socket_(std::move(sock)) {
-    }
+const char *kCivSharedMemName = "CivVmServerShm";
+const char *kCivSharedObjSync = "Civ Message Sync";
+const char *kCivSharedObjData = "Civ Message Data";
+const int kCivSharedMemSize = 10240U;
 
-    void start() {
-        do_read();
-    }
-
- private:
-    void do_read() {
-        auto self(shared_from_this());
-        memset(&msg_in_, 0, sizeof(msg_in_));
-        socket_.async_receive(boost::asio::buffer(&msg_in_, sizeof(msg_in_)),
-            [this, self](boost::system::error_code ec, std::size_t bytes) {
-                if (ec) {
-                    if (ec != boost::asio::error::eof)
-                        LOG(error) << "vm-manager: error happened when receiving data: "
-                                   << ec.message().c_str()
-                                   << "(" << ec.value() << ")";
-                    return;
-                }
-                LOG(info) << "vm-manager receive(Msg):"
-                          << "type=" << msg_in_.type
-                          << ", payload=" << msg_in_.payload;
-
-                switch (msg_in_.type) {
-                    case kCiVMsgStopServer:
-                        stop_server_ = true;
-                        break;
-                    case kCivMsgStartVm:
-                        StartVm(msg_in_.vm_pay_load);
-                        break;
-                    case kCivMsgTest:
-                        break;
-                    default:
-                        LOG(error) << "vm-manager: received unknown message type: " << msg_in_.type;
-                        return;
-                }
-                do_write(bytes);
-        });
-    }
-
-    void do_write(std::size_t bytes) {
-        auto self(shared_from_this());
-        memset(&msg_out_, 0, sizeof(msg_out_));
-        msg_out_.type = kCivMsgRespond;
-        snprintf(msg_out_.payload, sizeof(msg_out_.payload), "Done: Server received %ld bytes!", bytes);
-        socket_.async_send(boost::asio::buffer(&msg_out_, sizeof(msg_out_)),
-            [this, self](boost::system::error_code ec, std::size_t /*length*/) {
-            if (!ec) {
-                if (stop_server_) {
-                    socket_.close();
-                    Server &srv = Server::Get(0, 0, 0);
-                    srv.Stop();
-                    return;
-                }
-                do_read();
-            }
-        });
-    }
-
-    // The socket used to communicate with the client.
-    boost::asio::local::stream_protocol::socket socket_;
-    bool stop_server_ = false;
-    CivMsg msg_in_;
-    CivMsg msg_out_;
-};
-
-void Server::Accept() {
-    acceptor_.async_accept([this](boost::system::error_code ec, boost::asio::local::stream_protocol::socket socket) {
-        if (!ec) {
-            LOG(info) << "New Session: " << ec.message().c_str();
-            std::make_shared<session>(std::move(socket))->start();
-        }
-
-        Accept();
-    });
-}
-
-void Server::AsyncWaitSignal(void) {
-    boost::system::error_code ec;
-    signals_.add(SIGINT, ec);
-    if (ec)
-        LOG(warning) << "Failed to add SIG(" << SIGINT << "), " << ec.message().c_str();
-    signals_.add(SIGTERM, ec);
-    if (ec)
-        LOG(warning) << "Failed to add SIG(" << SIGTERM << "), " << ec.message().c_str();
-
-    signals_.async_wait(
-        [this](boost::system::error_code ec, int signo) {
-            LOG(info) << "Signal(" << signo << ") received!";
-            Stop();
-    });
+static void HandleSIG(int num) {
+    LOG(info) << "Signal(" << num << ") received!";
+    Server::Get().Stop();
 }
 
 void Server::Start(void) {
     try {
-        std::filesystem::remove(server_sock);
+        signal(SIGINT, HandleSIG);
+        signal(SIGTERM, HandleSIG);
 
-        boost::asio::local::stream_protocol::endpoint ep(server_sock);
-        acceptor_.open(ep.protocol());
-        acceptor_.bind(ep);
-        acceptor_.listen();
+        struct shm_remove {
+            shm_remove() { boost::interprocess::shared_memory_object::remove("CivVmServerShm"); }
+            ~shm_remove() { boost::interprocess::shared_memory_object::remove("CivVmServerShm"); }
+        } remover;
 
-        Accept();
+          boost::interprocess::managed_shared_memory shm(
+            boost::interprocess::create_only,
+            kCivSharedMemName,
+            kCivSharedMemSize);
 
-        AsyncWaitSignal();
-        LOG(info) << "Async wait signal done";
+        sync_ = shm.construct<CivMsgSync>
+                (kCivSharedObjSync)
+                ();
 
-        LOG(info) << "StartServer: context run "
-                  << ", pid=" << getpid()
-                  << ", uid=" << getuid();
-        ioc_.run();
+        while (!stop_server) {
+            boost::interprocess::scoped_lock <boost::interprocess::interprocess_mutex> lock(sync_->mutex);
+            sync_->cond_full.wait(lock);
+            std::pair<CivMsg*, boost::interprocess::managed_shared_memory::size_type> data;
+            data = shm.find<CivMsg>(kCivSharedObjData);
+            if (!data.first)
+                continue;
+            switch (data.first->type) {
+                case kCiVMsgStopServer:
+                    stop_server = true;
+                    break;
+                case kCivMsgStartVm:
+                    StartVm(data.first->vm_pay_load);
+                    break;
+                case kCivMsgTest:
+                    break;
+                default:
+                    LOG(error) << "vm-manager: received unknown message type: " << data.first->type;
+                    return;
+            }
+        }
 
         LOG(info) << "CiV Server exited!";
     } catch (std::exception &e) {
@@ -148,13 +85,12 @@ void Server::Start(void) {
 
 void Server::Stop(void) {
     LOG(info) << "Stop CiV Server!";
-    acceptor_.close();
-    ioc_.stop();
-    std::filesystem::remove(server_sock);
+    stop_server = true;
+    sync_->cond_full.notify_one();
 }
 
-Server &Server::Get(uid_t suid, gid_t sgid, bool daemon) {
-    static Server server_{ suid, sgid, daemon };
+Server &Server::Get(void) {
+    static Server server_;
     return server_;
 }
 

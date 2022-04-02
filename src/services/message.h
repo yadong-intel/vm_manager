@@ -8,7 +8,14 @@
 #ifndef __MESSAGE_H__
 #define __MESSAGE_H__
 
+#include <boost/interprocess/sync/interprocess_mutex.hpp>
+#include <boost/interprocess/sync/interprocess_condition.hpp>
+
 namespace vm_manager {
+
+extern const char *kCivSharedMemName;
+extern const char *kCivSharedObjSync;
+extern const char *kCivSharedObjData;
 
 enum CivMsgType {
     kCiVMsgStopServer = 100U,
@@ -23,6 +30,12 @@ struct StartVmPayload {
     char name[64];
     char env_disp[64];
     char env_xauth[128];
+};
+
+struct CivMsgSync {
+    boost::interprocess::interprocess_mutex mutex;
+    boost::interprocess::interprocess_condition cond_empty;
+    boost::interprocess::interprocess_condition cond_full;
 };
 
 struct CivMsg {

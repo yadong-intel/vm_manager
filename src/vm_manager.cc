@@ -14,6 +14,10 @@
 #include <boost/bind/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/interprocess/sync/scoped_lock.hpp>
 
 #include "utils/log.h"
 #include "utils/utils.h"
@@ -30,24 +34,9 @@ namespace vm_manager {
 
 bool IsServerRunning() {
     try {
-        if (!std::filesystem::exists(server_sock)) {
-            return false;
-        }
-        if (!std::filesystem::is_socket(server_sock)) {
-            return false;
-        }
-
-        Client c;
-        if (!c.Connect())
-            return false;
-        CivMsg req = { kCivMsgTest, "Test message" };
-        if (!c.Send(req)) {
-            return false;
-        }
-        CivMsg rep;
-        if (!c.Receive(&rep)) {
-            return false;
-        }
+        boost::interprocess::managed_shared_memory shm(
+            boost::interprocess::open_only,
+            kCivSharedMemName);
         return true;
     } catch (std::exception& e) {
         LOG(error) << "Exception: " << e.what();
@@ -62,28 +51,6 @@ static void StartGuest(std::string name) {
     }
 
     LOG(info) << "Start guest " << name;
-
-    Client c;
-    c.Connect();
-    CivMsg req = { kCivMsgStartVm, "" };
-    if (name.length() >= req.MaxPayloadSize) {
-        LOG(error) << "CiV Guest name exceed Max length:" << req.MaxPayloadSize;
-        return;
-    }
-    strncpy(req.vm_pay_load.name, name.c_str(), sizeof(req.vm_pay_load.name));
-    strncpy(req.vm_pay_load.env_disp, getenv("DISPLAY"), sizeof(req.vm_pay_load.env_disp));
-    strncpy(req.vm_pay_load.env_xauth, getenv("XAUTHORITY"), sizeof(req.vm_pay_load.env_xauth));
-
-    if (!c.Send(req)) {
-        LOG(error) << "Failed Send Start Guest request to server!";
-        return;
-    }
-    CivMsg rep;
-    if (!c.Receive(&rep)) {
-        LOG(error) << "Cannot get response after Start Guest request sent!";
-        return;
-    }
-
     return;
 }
 
@@ -120,7 +87,7 @@ static void StartServer(bool daemon) {
                   << " ---------------------";
     }
 
-    Server &srv = Server::Get(suid, sgid, daemon);
+    Server &srv = Server::Get();
 
     LOG(info) << "Starting Server!";
     srv.Start();
@@ -130,24 +97,29 @@ static void StartServer(bool daemon) {
 
 static void StopServer(void) {
     if (!IsServerRunning()) {
-        LOG(info) << "Server is not running!";
+        LOG(info) << "server is not running! Please start server first!";
         return;
     }
 
-    LOG(info) << "Stop host server";
-    Client c;
-    if (!c.Connect()) {
-        LOG(error) << "Failed to connect to server!";
+    boost::interprocess::managed_shared_memory shm(
+        boost::interprocess::open_only,
+        kCivSharedMemName);
+
+    std::pair<CivMsgSync*, boost::interprocess::managed_shared_memory::size_type> sync_res;
+    sync_res = shm.find<CivMsgSync>(kCivSharedObjSync);
+    if (!sync_res.first || (sync_res.second != 1)) {
+        LOG(error) << "Failed to find sync block!" << sync_res.first << " size=" << sync_res.second;
         return;
     }
-    CivMsg req = { kCiVMsgStopServer, "Stop server" };
-    if (!c.Send(req))
-        return;
-    CivMsg rep;
-    if (!c.Receive(&rep))
-        return;
-    LOG(info) << "Reply :type=" << rep.type << " payload: " << rep.payload;
-    return;
+
+    CivMsg *data = shm.construct<CivMsg>
+                (kCivSharedObjData)
+                ();
+
+    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(sync_res.first->mutex);
+    data->type = kCiVMsgStopServer;
+
+    sync_res.first->cond_full.notify_one();
 }
 
 namespace po = boost::program_options;
