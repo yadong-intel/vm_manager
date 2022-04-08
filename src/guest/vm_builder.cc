@@ -33,9 +33,9 @@ void VmBuilder::StartVm() {
     LOG(info) << "Emulator command:" << emul_cmd_;
 }
 
-VmBuilder::VmBuilder(struct StartVmPayload vm_payload) {
-    LOG(info) << "Config file path:" << GetConfigPath()  << std::string("/") << vm_payload.name << ".ini";
-    if (!cfg_.ReadConfigFile(GetConfigPath() + std::string("/") + vm_payload.name + ".ini")) {
+VmBuilder::VmBuilder(const char *name) {
+    LOG(info) << "Config file path:" << GetConfigPath()  << std::string("/") << name << ".ini";
+    if (!cfg_.ReadConfigFile(GetConfigPath() + std::string("/") + name + ".ini")) {
         LOG(error) << "Failed to read config file";
     }
 }

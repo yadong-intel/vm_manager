@@ -17,6 +17,9 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
+#include <boost/process/environment.hpp>
+#include <boost/interprocess/allocators/allocator.hpp>
+#include <boost/interprocess/containers/string.hpp>
 
 #include "services/server.h"
 #include "services/message.h"
@@ -26,10 +29,10 @@
 
 namespace vm_manager {
 
-const char *kCivSharedMemName = "CivVmServerShm";
-const char *kCivSharedObjSync = "Civ Message Sync";
-const char *kCivSharedObjData = "Civ Message Data";
-const int kCivSharedMemSize = 10240U;
+const char *kCivServerMemName = "CivServerShm";
+const char *kCivServerObjSync = "Civ Message Sync";
+const char *kCivServerObjData = "Civ Message Data";
+const int kCivSharedMemSize = 20480U;
 
 static void HandleSIG(int num) {
     LOG(info) << "Signal(" << num << ") received!";
@@ -42,32 +45,40 @@ void Server::Start(void) {
         signal(SIGTERM, HandleSIG);
 
         struct shm_remove {
-            shm_remove() { boost::interprocess::shared_memory_object::remove("CivVmServerShm"); }
-            ~shm_remove() { boost::interprocess::shared_memory_object::remove("CivVmServerShm"); }
+            shm_remove() { boost::interprocess::shared_memory_object::remove(kCivServerMemName); }
+            ~shm_remove() { boost::interprocess::shared_memory_object::remove(kCivServerMemName); }
         } remover;
 
-          boost::interprocess::managed_shared_memory shm(
+        boost::interprocess::permissions unrestricted_permissions;
+        unrestricted_permissions.set_unrestricted();
+        boost::interprocess::managed_shared_memory shm(
             boost::interprocess::create_only,
-            kCivSharedMemName,
-            kCivSharedMemSize);
+            kCivServerMemName,
+            sizeof(CivMsgSync) + sizeof(CivMsg) + 1024,
+            0,
+            unrestricted_permissions);
 
         sync_ = shm.construct<CivMsgSync>
-                (kCivSharedObjSync)
+                (kCivServerObjSync)
                 ();
 
         while (!stop_server) {
-            boost::interprocess::scoped_lock <boost::interprocess::interprocess_mutex> lock(sync_->mutex);
-            sync_->cond_full.wait(lock);
+            boost::interprocess::scoped_lock <boost::interprocess::interprocess_mutex> lock(sync_->mutex_cond);
+            sync_->cond_s.wait(lock);
+            LOG(info) << "Messge in";
             std::pair<CivMsg*, boost::interprocess::managed_shared_memory::size_type> data;
-            data = shm.find<CivMsg>(kCivSharedObjData);
+            data = shm.find<CivMsg>(kCivServerObjData);
+
             if (!data.first)
                 continue;
             switch (data.first->type) {
                 case kCiVMsgStopServer:
                     stop_server = true;
+                    sync_->cond_c.notify_one();
                     break;
                 case kCivMsgStartVm:
-                    StartVm(data.first->vm_pay_load);
+                    StartVm(data.first->payload);
+                    sync_->cond_c.notify_one();
                     break;
                 case kCivMsgTest:
                     break;
@@ -86,7 +97,7 @@ void Server::Start(void) {
 void Server::Stop(void) {
     LOG(info) << "Stop CiV Server!";
     stop_server = true;
-    sync_->cond_full.notify_one();
+    sync_->cond_s.notify_one();
 }
 
 Server &Server::Get(void) {

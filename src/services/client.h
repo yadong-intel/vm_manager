@@ -8,25 +8,23 @@
 #ifndef __CLIENT_H__
 #define __CLIENT_H__
 
-#include <boost/asio.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
 
 #include "services/message.h"
 
 namespace vm_manager {
 class Client {
  public:
-  Client() : sock_(ioc_) {}
-  ~Client() {
-    sock_.close();
-    ioc_.stop();
-  }
-  bool Connect(void);
-  bool Send(CivMsg msg);
-  bool Receive(CivMsg *msg);
+  Client();
+  ~Client();
+
+  void PrepareStartGuestClientShm(const char *vm_name);
+  bool Notify(CivMsgType t);
 
  private:
-  boost::asio::io_context ioc_;
-  boost::asio::local::stream_protocol::socket sock_;
+  boost::interprocess::managed_shared_memory server_shm_;
+  boost::interprocess::managed_shared_memory client_shm_;
+  std::string client_shm_name_;
 };
 
 }  // namespace vm_manager

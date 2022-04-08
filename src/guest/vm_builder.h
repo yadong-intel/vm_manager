@@ -18,7 +18,7 @@ namespace vm_manager {
 
 class VmBuilder {
  public:
-    explicit VmBuilder(struct StartVmPayload vm_payload);
+    explicit VmBuilder(const char *name);
     bool BuildVmArgs();
     void StartVm();
  private:

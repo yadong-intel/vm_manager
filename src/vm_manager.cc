@@ -11,13 +11,12 @@
 #include <map>
 #include <string>
 
-#include <boost/bind/bind.hpp>
-#include <boost/asio.hpp>
 #include <boost/program_options.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
+
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
+#include <boost/process/environment.hpp>
 
 #include "utils/log.h"
 #include "utils/utils.h"
@@ -36,19 +35,23 @@ bool IsServerRunning() {
     try {
         boost::interprocess::managed_shared_memory shm(
             boost::interprocess::open_only,
-            kCivSharedMemName);
+            kCivServerMemName);
         return true;
     } catch (std::exception& e) {
-        LOG(error) << "Exception: " << e.what();
+        LOG(warning) << "Server is not running: " << e.what();
         return false;
     }
 }
 
 static void StartGuest(std::string name) {
     if (!IsServerRunning()) {
-        LOG(info) << "server is not running! Please start server first!";
+        LOG(info) << "server is not running! Please start server!";
         return;
     }
+
+    Client c;
+    c.PrepareStartGuestClientShm(name.c_str());
+    c.Notify(kCivMsgStartVm);
 
     LOG(info) << "Start guest " << name;
     return;
@@ -71,16 +74,18 @@ static void StartServer(bool daemon) {
         sgid = atoi(sudo_gid);
 
     if (daemon) {
+        const char *log_file = "/tmp/civ_server.log";
         int ret = Daemonize();
         if (ret > 0) {
-            LOG(info) << "Forked daemon service (PID=" << ret << ")";
+            LOG(info) << "Starting service as daemon (PID=" << ret << ")";
+            LOG(info) << "Log will be redirected to " << log_file;
             return;
         } else if (ret < 0) {
             LOG(error) << "vm-manager: failed to Daemonize\n";
             return;
         }
 
-        logger::log2file("/tmp/civ_server.log");
+        logger::log2file(log_file);
         LOG(info) << "\n--------------------- "
                   << "CiV VM Manager Service started in background!"
                   << "(PID=" << getpid() << ")"
@@ -101,25 +106,8 @@ static void StopServer(void) {
         return;
     }
 
-    boost::interprocess::managed_shared_memory shm(
-        boost::interprocess::open_only,
-        kCivSharedMemName);
-
-    std::pair<CivMsgSync*, boost::interprocess::managed_shared_memory::size_type> sync_res;
-    sync_res = shm.find<CivMsgSync>(kCivSharedObjSync);
-    if (!sync_res.first || (sync_res.second != 1)) {
-        LOG(error) << "Failed to find sync block!" << sync_res.first << " size=" << sync_res.second;
-        return;
-    }
-
-    CivMsg *data = shm.construct<CivMsg>
-                (kCivSharedObjData)
-                ();
-
-    boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock(sync_res.first->mutex);
-    data->type = kCiVMsgStopServer;
-
-    sync_res.first->cond_full.notify_one();
+    Client c;
+    c.Notify(kCiVMsgStopServer);
 }
 
 namespace po = boost::program_options;
