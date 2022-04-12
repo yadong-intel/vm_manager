@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  */
-#ifndef __UTILS_H__
-#define __UTILS_H__
+#ifndef SRC_UTILS_UTILS_H_
+#define SRC_UTILS_UTILS_H_
 
 #ifndef MAX_PATH
 #define MAX_PATH 2048U
@@ -17,4 +17,4 @@
 const char *GetConfigPath(void);
 int Daemonize(void);
 
-#endif  //__UTILS_H__
+#endif  // SRC_UTILS_UTILS_H_

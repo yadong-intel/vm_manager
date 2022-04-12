@@ -10,7 +10,6 @@
 #include <vector>
 
 #include <boost/process.hpp>
-#include <boost/asio.hpp>
 #include <boost/process/environment.hpp>
 
 #include "guest/vm_builder.h"
@@ -36,8 +35,9 @@ void GuestThread(std::vector<std::string> env_data) {
         env_.set(s.substr(0, s.find('=')), s.substr(s.find('=') + 1));
     }
 
-    boost::process::child c(boost::process::search_path("qemu-system-x86_64"),
-                            boost::process::args = { "-device", "virtio-gpu" },
+    boost::process::child c(//boost::process::search_path("qemu-system-x86_64"),
+                            //boost::process::args = { "-device", "virtio-gpu" },
+                            "qemu-system-x86_64 -device virtio-gpu", 
                             env_,
                             boost::process::std_out > buf_o,
                             boost::process::std_err > buf_e,

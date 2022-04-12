@@ -5,8 +5,10 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  */
-#ifndef __CLIENT_H__
-#define __CLIENT_H__
+#ifndef SRC_SERVICES_CLIENT_H_
+#define SRC_SERVICES_CLIENT_H_
+
+#include <string>
 
 #include <boost/interprocess/managed_shared_memory.hpp>
 
@@ -29,4 +31,4 @@ class Client {
 
 }  // namespace vm_manager
 
-#endif /* __CLIENT_H__ */
+#endif  // SRC_SERVICES_CLIENT_H_

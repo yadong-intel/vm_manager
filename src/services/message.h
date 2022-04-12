@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  */
-#ifndef __MESSAGE_H__
-#define __MESSAGE_H__
+#ifndef SRC_SERVICES_MESSAGE_H_
+#define SRC_SERVICES_MESSAGE_H_
 
 #include <string>
 
@@ -51,4 +51,4 @@ struct CivMsg {
 
 }  // namespace vm_manager
 
-#endif /* __MESSAGE_H__ */
+#endif  // SRC_SERVICES_MESSAGE_H_

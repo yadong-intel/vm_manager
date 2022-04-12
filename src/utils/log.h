@@ -5,10 +5,12 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  */
-#ifndef __LOG_H__
-#define __LOG_H__
+#ifndef SRC_UTILS_LOG_H_
+#define SRC_UTILS_LOG_H_
 
 #pragma once
+
+#include <string>
 
 #include <boost/log/trivial.hpp>
 #include <boost/log/support/date_time.hpp>
@@ -22,14 +24,18 @@
 
 #ifdef DEBUG
 #define LOG_ADD_FILE boost::log::attribute_cast<boost::log::attributes::mutable_constant<std::string>>( \
-                     ::boost::log::trivial::logger::get().get_attributes()["File"]).set(logger::path_to_filename(__FILE__))
+                     ::boost::log::trivial::logger::get().get_attributes()["File"]).set( \
+                         logger::path_to_filename(__FILE__))
 
 #define LOG_ADD_LINE boost::log::attribute_cast<boost::log::attributes::mutable_constant<int>>( \
                      ::boost::log::trivial::logger::get().get_attributes()["Line"]).set(__LINE__)
 
 #define LOG_ADD_FUNC boost::log::attribute_cast<boost::log::attributes::mutable_constant<std::string>>( \
                      ::boost::log::trivial::logger::get().get_attributes()["Func"]).set(__FUNCTION__)
-#define DEBUG_OUTPUT LOG_ADD_FILE; LOG_ADD_LINE; LOG_ADD_FUNC;
+
+#define DEBUG_OUTPUT LOG_ADD_FILE; \
+                     LOG_ADD_LINE; \
+                     LOG_ADD_FUNC;
 #else
 #define DEBUG_OUTPUT
 #endif
@@ -47,7 +53,8 @@ namespace logger {
     namespace keywords = boost::log::keywords;
     template<typename ValueType>
     ValueType set_get_attrib(const char* name, ValueType value) {
-        auto attr = logging::attribute_cast<attrs::mutable_constant<ValueType>>(logging::trivial::logger::get().get_attributes()[name]);
+        auto attr = logging::attribute_cast<attrs::mutable_constant<ValueType>>
+                        (logging::trivial::logger::get().get_attributes()[name]);
         attr.set(value);
         return attr.get();
     }
@@ -102,4 +109,4 @@ namespace logger {
 
 }
 
-#endif  //__LOG_H__
+#endif  // SRC_UTILS_LOG_H_

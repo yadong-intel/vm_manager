@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  */
-#ifndef __CONFIG_PARSER_H__
-#define __CONFIG_PARSER_H__
+#ifndef SRC_GUEST_CONFIG_PARSER_H_
+#define SRC_GUEST_CONFIG_PARSER_H_
 
 #include <string>
 
@@ -110,4 +110,4 @@ class CivConfig final {
 
 }  // namespace vm_manager
 
-#endif /* __CONFIG_PARSER_H__ */
+#endif  // SRC_GUEST_CONFIG_PARSER_H_

@@ -7,10 +7,12 @@
  *
  */
 
-#ifndef __VM_BUILDER_H__
-#define __VM_BUILDER_H__
+#ifndef SRC_GUEST_VM_BUILDER_H_
+#define SRC_GUEST_VM_BUILDER_H_
 
 #include <string>
+#include <vector>
+#include <utility>
 
 #include "guest/config_parser.h"
 
@@ -23,10 +25,12 @@ class VmBuilder {
     void StartVm();
  private:
     CivConfig cfg_;
+    uint32_t vsock_cid_;
+    std::vector<std::pair<std::string, std::string>> prev_cmds_;
     std::string emul_cmd_;
     bool BuildQemuVmArgs();
 };
 
 }  // namespace vm_manager
 
-#endif /* __VM_BUILDER_H__ */
+#endif  // SRC_GUEST_VM_BUILDER_H_

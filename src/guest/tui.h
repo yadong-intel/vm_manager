@@ -5,8 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  */
-#ifndef __TUI_H__
-#define __TUI_H__
+#ifndef SRC_GUEST_TUI_H_
+#define SRC_GUEST_TUI_H_
 
 int create_tui(void);
 
@@ -153,4 +153,5 @@ class CivTui final {
     void InitializeButtons(void);
 };
 
-#endif /* __TUI_H__ */
+#endif  // SRC_GUEST_TUI_H_
+

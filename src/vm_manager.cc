@@ -33,9 +33,8 @@ namespace vm_manager {
 
 bool IsServerRunning() {
     try {
-        boost::interprocess::managed_shared_memory shm(
-            boost::interprocess::open_only,
-            kCivServerMemName);
+        Client c;
+        c.Notify(kCivMsgTest);
         return true;
     } catch (std::exception& e) {
         LOG(warning) << "Server is not running: " << e.what();
@@ -53,7 +52,7 @@ static void StartGuest(std::string name) {
     c.PrepareStartGuestClientShm(name.c_str());
     c.Notify(kCivMsgStartVm);
 
-    LOG(info) << "Start guest " << name;
+    LOG(info) << "Start guest: " << name;
     return;
 }
 

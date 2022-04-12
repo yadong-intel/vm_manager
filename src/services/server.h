@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  */
-#ifndef __SERVER_H__
-#define __SERVER_H__
+#ifndef SRC_SERVICES_SERVER_H_
+#define SRC_SERVICES_SERVER_H_
 
 #include "utils/log.h"
 #include "services/message.h"
@@ -38,4 +38,4 @@ class Server final {
 
 }  // namespace vm_manager
 
-#endif /* __SERVER_H__ */
+#endif  // SRC_SERVICES_SERVER_H_
