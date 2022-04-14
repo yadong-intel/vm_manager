@@ -39,6 +39,17 @@ void Client::PrepareStartGuestClientShm(const char *vm_name) {
     }
 }
 
+void Client::PrepareStopGuestClientShm(const char *vm_name) {
+    boost::process::environment env = boost::this_process::environment();
+
+    client_shm_.destroy<bstring>("StopVmName");
+    client_shm_.zero_free_memory();
+
+    bstring *var_name = client_shm_.construct<bstring>
+                ("StopVmName")
+                (vm_name, client_shm_.get_segment_manager());
+}
+
 bool Client::Notify(CivMsgType t) {
     std::pair<CivMsgSync*, boost::interprocess::managed_shared_memory::size_type> sync;
     sync = server_shm_.find<CivMsgSync>(kCivServerObjSync);

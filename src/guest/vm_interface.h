@@ -13,7 +13,7 @@
 
 namespace vm_manager {
 int StartVm(const char payload[]);
-int ShutdownVm(std::string name);
+int ShutdownVm(const char payload[]);
 
 }  // namespace vm_manager
 

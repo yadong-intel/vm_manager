@@ -56,6 +56,20 @@ static void StartGuest(std::string name) {
     return;
 }
 
+static void StopGuest(std::string name) {
+    if (!IsServerRunning()) {
+        LOG(info) << "server is not running! Please start server!";
+        return;
+    }
+
+    Client c;
+    c.PrepareStopGuestClientShm(name.c_str());
+    c.Notify(kCivMsgStopVm);
+
+    LOG(info) << "Stop guest: " << name;
+    return;
+}
+
 static void StartServer(bool daemon) {
     if (IsServerRunning()) {
         LOG(info) << "Server already running!";
@@ -166,6 +180,7 @@ class CivOptions final {
         }
 
         if (vm_.count("stop")) {
+            StopGuest(vm_["stop"].as<std::string>());
             return;
         }
 

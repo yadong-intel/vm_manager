@@ -21,6 +21,7 @@ class Client {
   ~Client();
 
   void PrepareStartGuestClientShm(const char *vm_name);
+  void PrepareStopGuestClientShm(const char *vm_name);
   bool Notify(CivMsgType t);
 
  private:

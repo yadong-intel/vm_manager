@@ -78,6 +78,9 @@ void Server::Start(void) {
                 case kCivMsgStartVm:
                     StartVm(data.first->payload);
                     break;
+                case kCivMsgStopVm:
+                    ShutdownVm(data.first->payload);
+                    break;
                 case kCivMsgTest:
                     break;
                 default:

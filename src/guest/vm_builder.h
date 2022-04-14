@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2022 Intel Corporation.
  * All rights reserved.
@@ -15,20 +14,23 @@
 #include <utility>
 
 #include "guest/config_parser.h"
+#include "guest/vm_process.h"
+#include "utils/log.h"
 
 namespace vm_manager {
 
 class VmBuilder {
  public:
-    explicit VmBuilder(const char *name);
-    bool BuildVmArgs();
-    void StartVm();
- private:
+    explicit VmBuilder(CivConfig cfg, std::vector<std::string> env) : cfg_(cfg), env_data_(env) {}
+    virtual bool BuildVmArgs() = 0;
+    virtual std::thread StartVm();
+
+ protected:
     CivConfig cfg_;
     uint32_t vsock_cid_;
-    std::vector<std::pair<std::string, std::string>> prev_cmds_;
+    std::vector<VmProcess *> co_procs;
     std::string emul_cmd_;
-    bool BuildQemuVmArgs();
+    std::vector<std::string> env_data_;
 };
 
 }  // namespace vm_manager
