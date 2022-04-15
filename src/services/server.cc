@@ -12,7 +12,7 @@
 #include <utility>
 #include <string>
 #include <memory>
-#include <filesystem>
+#include <vector>
 
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/mapped_region.hpp>
@@ -62,6 +62,8 @@ void Server::Start(void) {
                 (kCivServerObjSync)
                 ();
 
+        //std::vector<VmInstance> vm_instances;
+
         while (!stop_server) {
             boost::interprocess::scoped_lock <boost::interprocess::interprocess_mutex> lock(sync_->mutex_cond);
             sync_->cond_s.wait(lock);
@@ -77,6 +79,7 @@ void Server::Start(void) {
                     break;
                 case kCivMsgStartVm:
                     StartVm(data.first->payload);
+                    //vm_instances.push_back(CreateVmInstance(data.first->payload));
                     break;
                 case kCivMsgStopVm:
                     ShutdownVm(data.first->payload);

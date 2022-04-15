@@ -21,12 +21,12 @@
 
 namespace vm_manager {
 
-std::vector<std::pair<std::string, std::thread>> thread_pairs;
+std::vector<VmInstance> vm_instances;
 
-static int FindVmThread(std::string name) {
-    for (int i = 0; i < thread_pairs.size(); ++i) {
-        LOG(info) << "thread: " << thread_pairs[i].first << " id=" << std::hex << thread_pairs[i].second.get_id();
-        if (thread_pairs[i].first.compare(name) == 0)
+static int FindVmInstance(std::string name) {
+    for (int i = 0; i < vm_instances.size(); ++i) {
+        LOG(info) << "thread: " << vm_instances[i].GetName();
+        if (vm_instances[i].GetName().compare(name) == 0)
             return i;
     }
     return -1;
@@ -38,9 +38,12 @@ int ShutdownVm(const char payload[]) {
         payload);
     std::pair<bstring*, boost::interprocess::managed_shared_memory::size_type> vm_name;
     vm_name = shm.find<bstring>("StopVmName");
-    int id = FindVmThread(std::string(vm_name.first->c_str()));
-    if (id != -1)
-        LOG(info) << "thread joinable?  " << thread_pairs[id].second.joinable();
+    int id = FindVmInstance(std::string(vm_name.first->c_str()));
+    if (id != -1) {
+        LOG(info) << "thread joinable?  " << vm_instances[id].GetName();
+        vm_instances[id].Stop();
+        vm_instances.erase(vm_instances.begin() + id);
+    }
     if (id == -1)
         LOG(warning) << "CiV: " << vm_name.first->c_str() << " is not running!";
     return 0;
@@ -54,7 +57,7 @@ int StartVm(const char payload[]) {
     vm_name = shm.find<bstring>("StartVmName");
     std::string cfg_file = GetConfigPath() + std::string("/") + vm_name.first->c_str() + ".ini";
 
-    if (FindVmThread(std::string(vm_name.first->c_str())) != -1) {
+    if (FindVmInstance(std::string(vm_name.first->c_str())) != -1) {
         LOG(warning) << "CiV: " << vm_name.first->c_str() << " is already running!";
         return -1;
     }
@@ -73,23 +76,32 @@ int StartVm(const char payload[]) {
         return -1;
     }
 
-    VmBuilder *vb = nullptr;
-    if (cfg.GetValue(kGroupEmul, kEmulType) == kEmulTypeQemu) {
-        vb = new VmBuilderQemu(std::move(cfg), std::move(env_data));
+    auto vmi = vm_instances.emplace(
+        vm_instances.end(),
+        vm_name.first->c_str(), std::move(cfg), std::move(env_data));
+
+    vmi->Build();
+    vmi->Start();
+
+    return 0;
+}
+
+void VmInstance::Build(void) {
+    if (cfg_.GetValue(kGroupEmul, kEmulType) == kEmulTypeQemu) {
+        vb_ = new VmBuilderQemu(std::move(env_data_));
     } else {
         /* Default try to build args for QEMU */
-        vb = new VmBuilderQemu(std::move(cfg), std::move(env_data));
+        vb_ = new VmBuilderQemu(std::move(env_data_));
     }
+    vb_->BuildVmArgs(cfg_);
+}
 
-    if (vb->BuildVmArgs()) {
-        std::thread t = vb->StartVm();
-        t.detach();
-        thread_pairs.push_back(make_pair(std::string(vm_name.first->c_str()), std::move(t)));
-    } else {
-        LOG(error) << "Failed to build args";
-        return -1;
-    }
-    return 0;
+void VmInstance::Start(void) {
+    vb_->StartVm();
+}
+
+void VmInstance::Stop(void) {
+    vb_->StopVm();
 }
 
 }  //  namespace vm_manager

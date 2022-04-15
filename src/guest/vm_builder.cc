@@ -18,18 +18,24 @@
 
 namespace vm_manager {
 
-std::thread VmBuilder::StartVm() {
-    return std::thread ([this](){
+void VmBuilder::StartVm() {
+    main_th_ = boost::thread([this](){
         LOG(info) << "Emulator command:" << emul_cmd_;
 
-        boost::process::group g;
-        std::thread t;
-        for (VmProcess *vp : co_procs) {
-            t = vp->Run();
-            t.detach();
+        //boost::process::group g;
+        //boost::thread t;
+        for (VmProcess *vp : co_procs_) {
+            tg_.add_thread(&vp->Run(&sub_proc_grp_));
         }
         //g.terminate();
     });
+}
+
+void VmBuilder::StopVm() {
+    //sub_proc_grp_.terminate();
+    for (VmProcess *vp : co_procs_) {
+        vp->Stop();
+    }
 }
 
 }  //  namespace vm_manager

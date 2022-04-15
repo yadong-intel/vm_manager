@@ -21,8 +21,8 @@ namespace vm_manager {
 
 class VmBuilderQemu : public VmBuilder {
  public:
-    explicit VmBuilderQemu(CivConfig cfg, std::vector<std::string> env) : VmBuilder(cfg, env) {}
-    bool BuildVmArgs();
+    explicit VmBuilderQemu(std::vector<std::string> env) : VmBuilder(env) {}
+    bool BuildVmArgs(CivConfig cfg_);
 };
 
 }  // namespace vm_manager

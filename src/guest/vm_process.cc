@@ -10,16 +10,16 @@
 
 #include <boost/process.hpp>
 #include <boost/process/environment.hpp>
+#include <boost/thread.hpp>
 
 #include "utils/log.h"
 #include "guest/vm_process.h"
 
 namespace vm_manager {
 
-static void RunProc(std::string cmd, std::vector<std::string> env_data) {
+static void RunProc(std::string cmd, std::vector<std::string> env_data, boost::asio::io_context *ioc, boost::process::group *g) {
     LOG(info) << "Thread-0x" << std::hex << std::this_thread::get_id() << " Starting";
     std::error_code ec;
-    boost::asio::io_context ioc;
     std::future<std::string> buf_o, buf_e;
     boost::process::environment env;
 
@@ -33,12 +33,16 @@ static void RunProc(std::string cmd, std::vector<std::string> env_data) {
                             env,
                             boost::process::std_out > buf_o,
                             boost::process::std_err > buf_e,
-                            ioc);
+                            *ioc, *g);
 
     LOG(info) << "Running=" << c.running(ec) << ", PID="<< c.id();
     LOG(info) << ec.message();
 
-    ioc.run();
+    ioc->run();
+
+    if (c.running()) {
+        c.terminate();
+    }
 
     int result = c.exit_code();
 
@@ -47,17 +51,15 @@ static void RunProc(std::string cmd, std::vector<std::string> env_data) {
     LOG(info) << "Thread-0x" << std::hex << std::this_thread::get_id() << " Exiting";
 }
 
-std::thread VmCoProcSimple::Run(void) {
-    return std::thread ([this](){
-        LOG(info) << cmd_;
-        RunProc(cmd_, env_data_);
-    });
+boost::thread &VmCoProcSimple::Run(boost::process::group *g) {
+    mon_ = boost::thread(RunProc, cmd_, env_data_, &ioc_, g);
+    return mon_;
 }
 
 const char *kRpmbData = "RPMB_DATA";
 const char *kRpmbSock = "rpmb_sock";
 
-std::thread VmCoProcRpmb::Run(void) {
+boost::thread &VmCoProcRpmb::Run(boost::process::group *g) {
     LOG(info) << bin_ << " " << data_dir_;
     if (!boost::filesystem::exists(data_dir_ + "/" + kRpmbData)) {
         std::error_code ec;
@@ -65,15 +67,14 @@ std::thread VmCoProcRpmb::Run(void) {
         init_data.wait(ec);
         int ret = init_data.exit_code();
         if (ret != 0) {
-            return std::thread ();
+            mon_.~thread();
+            return mon_;
         }
     }
     cmd_ = bin_ + " --dev " + data_dir_ + "/" + kRpmbData + " --sock " + data_dir_ + "/" + kRpmbSock;
 
-    return std::thread ([this](){
-        LOG(info) << cmd_;
-        RunProc(cmd_, env_data_);
-    });
+    mon_ = boost::thread(RunProc, cmd_, env_data_, &ioc_, g);
+    return mon_;
 }
 
 }  //  namespace vm_manager

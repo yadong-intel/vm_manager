@@ -11,7 +11,9 @@
 
 #include <string>
 #include <vector>
-#include <thread>
+
+#include <boost/thread.hpp>
+#include <boost/asio.hpp>
 
 namespace vm_manager {
 
@@ -20,17 +22,24 @@ extern const char *kRpmbSock;
 
 class VmProcess {
  public:
-    virtual std::thread Run(void) = 0;
+    virtual boost::thread &Run(boost::process::group *g) = 0;
+    virtual void Stop(void) = 0;
+ protected:
+    boost::thread mon_;
 };
 
 class VmCoProcSimple : public VmProcess {
  public:
     VmCoProcSimple(std::string cmd, std::vector<std::string> env) :
                     cmd_(cmd), env_data_(env) {}
-    virtual std::thread Run(void);
+    virtual boost::thread &Run(boost::process::group *g);
+    virtual void Stop(void) {
+       ioc_.stop();
+    }
  protected:
     std::string cmd_;
     std::vector<std::string> env_data_;
+    boost::asio::io_context ioc_;
 };
 
 class VmCoProcRpmb : public VmCoProcSimple {
@@ -38,7 +47,7 @@ class VmCoProcRpmb : public VmCoProcSimple {
     VmCoProcRpmb(std::string bin, std::string data_dir, std::vector<std::string> env) :
           VmCoProcSimple("", env), bin_(bin), data_dir_(data_dir) {}
 
-    std::thread Run(void);
+    boost::thread &Run(boost::process::group *g);
 
  private:
     std::string bin_;

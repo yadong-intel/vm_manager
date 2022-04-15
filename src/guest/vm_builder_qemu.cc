@@ -22,7 +22,7 @@
 
 namespace vm_manager {
 
-bool VmBuilderQemu::BuildVmArgs() {
+bool VmBuilderQemu::BuildVmArgs(CivConfig cfg_) {
     LOG(info) << "build qemu vm args";
 
     std::string str_emul_path = cfg_.GetValue(kGroupEmul, kEmulPath);
@@ -108,7 +108,9 @@ bool VmBuilderQemu::BuildVmArgs() {
     //co_procs.push_back(vcpr);
 
     VmProcess *test = new VmCoProcSimple("qemu-system-x86_64 -device virtio-gpu", env_data_);
-    co_procs.push_back(test);
+    co_procs_.push_back(test);
+    VmProcess *test2 = new VmCoProcSimple("qemu-system-x86_64 -device virtio-gpu", env_data_);
+    co_procs_.push_back(test2);
 
     std::string vtpm_bin = cfg_.GetValue(kGroupVtpm, kVtpmBinPath);
     std::string vtpm_data = cfg_.GetValue(kGroupVtpm, kVtpmDataDir);
