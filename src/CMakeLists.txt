@@ -37,6 +37,7 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE ep_boost::log_setup
   PRIVATE ep_boost::thread
   PRIVATE ep_boost::filesystem
+  PRIVATE ep_boost::chrono
   -lrt
 )
 

@@ -39,6 +39,7 @@ ExternalProject_Add(ep_boost
                   --with-program_options
                   --with-log
                   --with-filesystem
+                  --with-chrono
 
     INSTALL_COMMAND ""
     LOG_CONFIGURE 1
@@ -65,3 +66,4 @@ add_boost_lib(program_options)
 add_boost_lib(log)
 add_boost_lib(log_setup)
 add_boost_lib(filesystem)
+add_boost_lib(chrono)

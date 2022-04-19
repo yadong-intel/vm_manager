@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <exception>
 
 #include <boost/thread.hpp>
 #include <boost/process.hpp>
@@ -24,21 +25,14 @@ namespace vm_manager {
 
 class VmBuilder {
  public:
-    explicit VmBuilder(std::vector<std::string> env) : env_data_(env) {}
-    virtual bool BuildVmArgs(CivConfig cfg) = 0;
-    virtual void StartVm();
-    void StopVm();
-
+    VmBuilder(std::string name) : name_(name) {}
+    virtual ~VmBuilder() = default;
+    virtual bool BuildVmArgs(void) = 0;
+    virtual void StartVm(void) = 0;
+    virtual void StopVm(void) = 0;
+    std::string GetName(void) { return name_; }
  protected:
-    CivConfig cfg__;
-    uint32_t vsock_cid_;
-    std::vector<VmProcess *> co_procs_;
-    std::string emul_cmd_;
-    std::vector<std::string> env_data_;
-    boost::thread main_th_;
-    boost::thread_group tg_;
-    boost::process::group sub_proc_grp_;
-    bool shut_vm = false;
+    std::string name_;
 };
 
 }  // namespace vm_manager

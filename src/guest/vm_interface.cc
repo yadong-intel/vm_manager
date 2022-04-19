@@ -8,6 +8,7 @@
  */
 #include <utility>
 #include <vector>
+#include <memory>
 
 #include <boost/process.hpp>
 #include <boost/process/environment.hpp>
@@ -21,12 +22,11 @@
 
 namespace vm_manager {
 
-std::vector<VmInstance> vm_instances;
+std::vector<std::unique_ptr<VmBuilder>> vm_instances;
 
 static int FindVmInstance(std::string name) {
     for (int i = 0; i < vm_instances.size(); ++i) {
-        LOG(info) << "thread: " << vm_instances[i].GetName();
-        if (vm_instances[i].GetName().compare(name) == 0)
+        if (vm_instances[i]->GetName().compare(name) == 0)
             return i;
     }
     return -1;
@@ -40,8 +40,7 @@ int ShutdownVm(const char payload[]) {
     vm_name = shm.find<bstring>("StopVmName");
     int id = FindVmInstance(std::string(vm_name.first->c_str()));
     if (id != -1) {
-        LOG(info) << "thread joinable?  " << vm_instances[id].GetName();
-        vm_instances[id].Stop();
+        vm_instances[id]->StopVm();
         vm_instances.erase(vm_instances.begin() + id);
     }
     if (id == -1)
@@ -53,8 +52,8 @@ int StartVm(const char payload[]) {
     boost::interprocess::managed_shared_memory shm(
         boost::interprocess::open_only,
         payload);
-    std::pair<bstring*, boost::interprocess::managed_shared_memory::size_type> vm_name;
-    vm_name = shm.find<bstring>("StartVmName");
+
+    auto vm_name = shm.find<bstring>("StartVmName");
     std::string cfg_file = GetConfigPath() + std::string("/") + vm_name.first->c_str() + ".ini";
 
     if (FindVmInstance(std::string(vm_name.first->c_str())) != -1) {
@@ -62,8 +61,7 @@ int StartVm(const char payload[]) {
         return -1;
     }
 
-    std::pair<bstring*, boost::interprocess::managed_shared_memory::size_type> vm_env;
-    vm_env = shm.find<bstring>("StartVmEnv");
+    auto vm_env = shm.find<bstring>("StartVmEnv");
     std::vector<std::string> env_data;
 
     for (int i = 0; i < vm_env.second; i++) {
@@ -76,32 +74,19 @@ int StartVm(const char payload[]) {
         return -1;
     }
 
-    auto vmi = vm_instances.emplace(
-        vm_instances.end(),
-        vm_name.first->c_str(), std::move(cfg), std::move(env_data));
-
-    vmi->Build();
-    vmi->Start();
-
-    return 0;
-}
-
-void VmInstance::Build(void) {
-    if (cfg_.GetValue(kGroupEmul, kEmulType) == kEmulTypeQemu) {
-        vb_ = new VmBuilderQemu(std::move(env_data_));
+    std::vector<std::unique_ptr<VmBuilder>>::iterator vmi;
+    if (cfg.GetValue(kGroupEmul, kEmulType) == kEmulTypeQemu) {
+        vmi = vm_instances.emplace(vm_instances.end(),
+                    std::make_unique<VmBuilderQemu>(vm_name.first->c_str(), std::move(cfg), std::move(env_data)));
     } else {
         /* Default try to build args for QEMU */
-        vb_ = new VmBuilderQemu(std::move(env_data_));
+        vmi = vm_instances.emplace(vm_instances.end(),
+                    std::make_unique<VmBuilderQemu>(vm_name.first->c_str(), std::move(cfg), std::move(env_data)));
     }
-    vb_->BuildVmArgs(cfg_);
-}
+    vmi->get()->BuildVmArgs();
+    vmi->get()->StartVm();
 
-void VmInstance::Start(void) {
-    vb_->StartVm();
-}
-
-void VmInstance::Stop(void) {
-    vb_->StopVm();
+    return 0;
 }
 
 }  //  namespace vm_manager

@@ -18,24 +18,5 @@
 
 namespace vm_manager {
 
-void VmBuilder::StartVm() {
-    main_th_ = boost::thread([this](){
-        LOG(info) << "Emulator command:" << emul_cmd_;
-
-        //boost::process::group g;
-        //boost::thread t;
-        for (VmProcess *vp : co_procs_) {
-            tg_.add_thread(&vp->Run(&sub_proc_grp_));
-        }
-        //g.terminate();
-    });
-}
-
-void VmBuilder::StopVm() {
-    //sub_proc_grp_.terminate();
-    for (VmProcess *vp : co_procs_) {
-        vp->Stop();
-    }
-}
 
 }  //  namespace vm_manager

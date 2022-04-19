@@ -8,6 +8,7 @@
  */
 #include <mutex>
 #include <utility>
+#include <memory>
 
 #include <boost/process.hpp>
 
@@ -22,7 +23,7 @@
 
 namespace vm_manager {
 
-bool VmBuilderQemu::BuildVmArgs(CivConfig cfg_) {
+bool VmBuilderQemu::BuildVmArgs(void) {
     LOG(info) << "build qemu vm args";
 
     std::string str_emul_path = cfg_.GetValue(kGroupEmul, kEmulPath);
@@ -104,13 +105,11 @@ bool VmBuilderQemu::BuildVmArgs(CivConfig cfg_) {
                          " -chardev socket,id=rpmb0,path=" +
                            rpmb_data + "/" + std::string(kRpmbSock));
     }
-    //VmProcess *vcpr = new VmCoProcRpmb(std::move(rpmb_bin), std::move(rpmb_data), env_data_);
-    //co_procs.push_back(vcpr);
+    co_procs_.emplace_back(std::make_unique<VmCoProcRpmb>(std::move(rpmb_bin), std::move(rpmb_data), env_data_));
 
-    VmProcess *test = new VmCoProcSimple("qemu-system-x86_64 -device virtio-gpu", env_data_);
-    co_procs_.push_back(test);
-    VmProcess *test2 = new VmCoProcSimple("qemu-system-x86_64 -device virtio-gpu", env_data_);
-    co_procs_.push_back(test2);
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(" qemu-system-x86_64 -device virtio-gpu", env_data_));
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>("  qemu-system-x86_64 -device virtio-gpu", env_data_));
+
 
     std::string vtpm_bin = cfg_.GetValue(kGroupVtpm, kVtpmBinPath);
     std::string vtpm_data = cfg_.GetValue(kGroupVtpm, kVtpmDataDir);
@@ -122,5 +121,20 @@ bool VmBuilderQemu::BuildVmArgs(CivConfig cfg_) {
 
     return true;
 }
+
+void VmBuilderQemu::StartVm() {
+    LOG(info) << "Emulator command:" << emul_cmd_;
+
+    for (int i = 0; i < co_procs_.size(); ++i) {
+        co_procs_[i]->Run();
+    }
+}
+
+void VmBuilderQemu::StopVm() {
+    for (int i = 0; i < co_procs_.size(); ++i) {
+        co_procs_[i]->Stop();
+    }
+}
+
 
 }  //  namespace vm_manager

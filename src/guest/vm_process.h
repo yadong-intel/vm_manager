@@ -11,9 +11,12 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>
+
+#include "utils/log.h"
 
 namespace vm_manager {
 
@@ -22,24 +25,26 @@ extern const char *kRpmbSock;
 
 class VmProcess {
  public:
-    virtual boost::thread &Run(boost::process::group *g) = 0;
+    virtual void Run(void) = 0;
     virtual void Stop(void) = 0;
- protected:
-    boost::thread mon_;
+    virtual ~VmProcess() = default;
 };
 
 class VmCoProcSimple : public VmProcess {
  public:
     VmCoProcSimple(std::string cmd, std::vector<std::string> env) :
                     cmd_(cmd), env_data_(env) {}
-    virtual boost::thread &Run(boost::process::group *g);
-    virtual void Stop(void) {
-       ioc_.stop();
-    }
+    virtual void Run(void);
+    virtual void Stop(void);
+    virtual ~VmCoProcSimple() = default;
  protected:
+    void ThreadMon(void);
+
     std::string cmd_;
     std::vector<std::string> env_data_;
     boost::asio::io_context ioc_;
+    std::unique_ptr<boost::thread> mon_;
+    std::unique_ptr<boost::process::child> c_;
 };
 
 class VmCoProcRpmb : public VmCoProcSimple {
@@ -47,7 +52,9 @@ class VmCoProcRpmb : public VmCoProcSimple {
     VmCoProcRpmb(std::string bin, std::string data_dir, std::vector<std::string> env) :
           VmCoProcSimple("", env), bin_(bin), data_dir_(data_dir) {}
 
-    boost::thread &Run(boost::process::group *g);
+    virtual void Run(void);
+    void Stop(void);
+    ~VmCoProcRpmb() = default;
 
  private:
     std::string bin_;

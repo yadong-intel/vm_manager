@@ -13,6 +13,9 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <memory>
+
+#include <boost/ptr_container/ptr_vector.hpp>
 
 #include "guest/config_parser.h"
 #include "guest/vm_builder.h"
@@ -21,8 +24,20 @@ namespace vm_manager {
 
 class VmBuilderQemu : public VmBuilder {
  public:
-    explicit VmBuilderQemu(std::vector<std::string> env) : VmBuilder(env) {}
-    bool BuildVmArgs(CivConfig cfg_);
+    explicit VmBuilderQemu(std::string name, CivConfig cfg, std::vector<std::string> env) :
+                       VmBuilder(name), cfg_(cfg), env_data_(env) {}
+    virtual ~VmBuilderQemu() = default;
+    bool BuildVmArgs(void);
+    void StartVm(void);
+    void StopVm(void);
+
+ private:
+    CivConfig cfg_;
+    uint32_t vsock_cid_;
+    std::vector<std::unique_ptr<VmProcess>> co_procs_;
+    std::string emul_cmd_;
+    std::vector<std::string> env_data_;
+    boost::thread main_th_;
 };
 
 }  // namespace vm_manager
