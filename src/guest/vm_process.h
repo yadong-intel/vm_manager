@@ -42,7 +42,6 @@ class VmCoProcSimple : public VmProcess {
 
     std::string cmd_;
     std::vector<std::string> env_data_;
-    boost::asio::io_context ioc_;
     std::unique_ptr<boost::thread> mon_;
     std::unique_ptr<boost::process::child> c_;
 };

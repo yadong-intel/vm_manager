@@ -52,8 +52,8 @@ void VmCoProcSimple::ThreadMon(void) {
     int result = c_->exit_code();
 
     LOG(info) << "Thread-0x" << tid << " Exiting"
-              << "\nChild-" << c_->id() << " exited, exit code=" << result
-              << "\nlog: " << f_out;
+              << "\t\t\nChild-" << c_->id() << " exited, exit code=" << result
+              << "\t\t\nlog: " << f_out;
 }
 
 void VmCoProcSimple::Run(void) {

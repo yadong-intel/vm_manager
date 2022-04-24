@@ -9,31 +9,43 @@
 #ifndef SRC_SERVICES_SERVER_H_
 #define SRC_SERVICES_SERVER_H_
 
+#include <string>
+#include <vector>
+#include <memory>
+
 #include "utils/log.h"
+#include "guest/vm_builder.h"
 #include "services/message.h"
 
 namespace vm_manager {
 
 class Server final {
  public:
-  static Server &Get(void);
-  void Start(void);
-  void Stop(void);
+    static Server &Get(void);
+    void Start(void);
+    void Stop(void);
 
  private:
-  Server() = default;
+    Server() = default;
+    ~Server() = default;
 
-  ~Server() = default;
+    Server(const Server&) = delete;
+    Server& operator=(const Server&) = delete;
 
-  Server(const Server&) = delete;
-  Server& operator=(const Server&) = delete;
+    size_t FindVmInstance(std::string name);
 
-  void Accept();
+    int StartVm(const char payload[]);
+    int ShutdownVm(const char payload[]);
 
-  void AsyncWaitSignal(void);
+    void Accept();
 
-  bool stop_server = false;
-  CivMsgSync *sync_;
+    void AsyncWaitSignal(void);
+
+    bool stop_server = false;
+
+    CivMsgSync *sync_;
+
+    std::vector<std::unique_ptr<VmBuilder>> vmis_;
 };
 
 }  // namespace vm_manager

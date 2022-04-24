@@ -76,16 +76,6 @@ static void StartServer(bool daemon) {
         return;
     }
 
-    int suid = getuid();
-    char *sudo_uid = std::getenv("SUDO_UID");
-    if (sudo_uid)
-        suid = atoi(sudo_uid);
-
-    int sgid = getgid();
-    char *sudo_gid = std::getenv("SUDO_GID");
-    if (sudo_gid)
-        sgid = atoi(sudo_gid);
-
     if (daemon) {
         const char *log_file = "/tmp/civ_server.log";
         int ret = Daemonize();
