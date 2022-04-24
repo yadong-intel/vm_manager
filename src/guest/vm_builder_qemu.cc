@@ -125,13 +125,13 @@ bool VmBuilderQemu::BuildVmArgs(void) {
 void VmBuilderQemu::StartVm() {
     LOG(info) << "Emulator command:" << emul_cmd_;
 
-    for (int i = 0; i < co_procs_.size(); ++i) {
+    for (size_t i = 0; i < co_procs_.size(); ++i) {
         co_procs_[i]->Run();
     }
 }
 
 void VmBuilderQemu::StopVm() {
-    for (int i = 0; i < co_procs_.size(); ++i) {
+    for (size_t i = 0; i < co_procs_.size(); ++i) {
         co_procs_[i]->Stop();
     }
 }
