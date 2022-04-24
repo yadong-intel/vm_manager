@@ -15,7 +15,7 @@ include(FTXUICMake)
 
 set(PROJECT_NAME "vm-manager")
 project(${PROJECT_NAME})
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-variable -Wno-c++11-narrowing")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-variable -Wno-narrowing")
 
 find_package(PkgConfig REQUIRED)
 include_directories(${DEPS_INCS_INCLUDE_DIRS})

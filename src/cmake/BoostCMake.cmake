@@ -13,16 +13,16 @@ set(EXTRA_CMAKE_ARGS)
 set(BOOST_BOOTSTRAP_COMMAND ./bootstrap.sh)
 set(BOOST_BUILD_TOOL ./b2)
 set(BOOST_CXXFLAGS "cxxflags=-std=c++17")
-set(BOOST_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/INSTALL/boost_1.78.0)
+set(BOOST_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/INSTALL/boost_1.79.0)
 
 ExternalProject_Add(ep_boost
 
     PREFIX ${CMAKE_BINARY_DIR}/external
     TIMEOUT 300
 
-    URL https://boostorg.jfrog.io/artifactory/main/release/1.78.0/source/boost_1_78_0.tar.bz2
+    URL https://boostorg.jfrog.io/artifactory/main/release/1.79.0/source/boost_1_79_0.tar.bz2
 
-    URL_HASH SHA256=8681f175d4bdb26c52222665793eef08490d7758529330f98d3b29dd0735bccc
+    URL_HASH SHA256=475d589d51a7f8b3ba2ba4eda022b170e562ca3b760ee922c146b6c65856ef39
 
     BUILD_IN_SOURCE 1
 
