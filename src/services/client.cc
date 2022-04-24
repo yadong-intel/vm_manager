@@ -81,14 +81,15 @@ Client::Client() {
     server_shm_ = boost::interprocess::managed_shared_memory(boost::interprocess::open_only, kCivServerMemName);
 
     client_shm_name_ = std::string("CivClientShm" + std::to_string(getpid()));
-    boost::interprocess::permissions unrestricted_permissions;
-    unrestricted_permissions.set_unrestricted();
+    boost::interprocess::permissions perm;
+    //unrestricted_permissions.set_unrestricted();
+    perm.set_default();
     client_shm_ = boost::interprocess::managed_shared_memory(
             boost::interprocess::create_only,
             client_shm_name_.c_str(),
             65536,
             0,
-            unrestricted_permissions);
+            perm);
 }
 
 Client::~Client() {

@@ -136,5 +136,4 @@ void VmBuilderQemu::StopVm() {
     }
 }
 
-
 }  //  namespace vm_manager

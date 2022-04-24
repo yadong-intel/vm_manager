@@ -23,7 +23,6 @@
 
 #include "services/server.h"
 #include "services/message.h"
-//#include "guest/vm_interface.h"
 #include "guest/vm_builder_qemu.h"
 #include "utils/log.h"
 #include "utils/utils.h"
@@ -43,7 +42,7 @@ size_t Server::FindVmInstance(std::string name) {
     return -1;
 }
 
-int Server::ShutdownVm(const char payload[]) {
+int Server::StopVm(const char payload[]) {
     boost::interprocess::managed_shared_memory shm(
         boost::interprocess::open_only,
         payload);
@@ -61,7 +60,7 @@ int Server::ShutdownVm(const char payload[]) {
 
 int Server::StartVm(const char payload[]) {
     boost::interprocess::managed_shared_memory shm(
-        boost::interprocess::open_only,
+        boost::interprocess::open_read_only,
         payload);
 
     auto vm_name = shm.find<bstring>("StartVmName");
@@ -128,7 +127,7 @@ void Server::Start(void) {
                 (kCivServerObjSync)
                 ();
 
-        while (!stop_server) {
+        while (!stop_server_) {
             boost::interprocess::scoped_lock <boost::interprocess::interprocess_mutex> lock(sync_->mutex_cond);
             sync_->cond_s.wait(lock);
 
@@ -137,15 +136,16 @@ void Server::Start(void) {
 
             if (!data.first)
                 continue;
+
             switch (data.first->type) {
                 case kCiVMsgStopServer:
-                    stop_server = true;
+                    stop_server_ = true;
                     break;
                 case kCivMsgStartVm:
                     StartVm(data.first->payload);
                     break;
                 case kCivMsgStopVm:
-                    ShutdownVm(data.first->payload);
+                    StopVm(data.first->payload);
                     break;
                 case kCivMsgTest:
                     break;
@@ -156,6 +156,8 @@ void Server::Start(void) {
             sync_->cond_c.notify_one();
         }
 
+        shm.destroy_ptr(sync_);
+
         LOG(info) << "CiV Server exited!";
     } catch (std::exception &e) {
         LOG(error) << "CiV Server: Exception:" << e.what() << ", pid=" << getpid();
@@ -164,7 +166,7 @@ void Server::Start(void) {
 
 void Server::Stop(void) {
     LOG(info) << "Stop CiV Server!";
-    stop_server = true;
+    stop_server_ = true;
     sync_->cond_s.notify_one();
 }
 

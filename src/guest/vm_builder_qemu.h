@@ -26,7 +26,7 @@ class VmBuilderQemu : public VmBuilder {
  public:
     explicit VmBuilderQemu(std::string name, CivConfig cfg, std::vector<std::string> env) :
                        VmBuilder(name), cfg_(cfg), env_data_(env) {}
-    virtual ~VmBuilderQemu() = default;
+    ~VmBuilderQemu() = default;
     bool BuildVmArgs(void);
     void StartVm(void);
     void StopVm(void);

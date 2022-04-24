@@ -52,8 +52,8 @@ void VmCoProcSimple::ThreadMon(void) {
     int result = c_->exit_code();
 
     LOG(info) << "Thread-0x" << tid << " Exiting"
-              << "\t\t\nChild-" << c_->id() << " exited, exit code=" << result
-              << "\t\t\nlog: " << f_out;
+              << "\n\t\tChild-" << c_->id() << " exited, exit code=" << result
+              << "\n\t\tlog: " << f_out;
 }
 
 void VmCoProcSimple::Run(void) {
@@ -61,9 +61,16 @@ void VmCoProcSimple::Run(void) {
 }
 
 void VmCoProcSimple::Stop(void) {
-    LOG(info) << "Terminate Simp Proc: " << c_->id();
+    if (!mon_.get())
+        return;
+    LOG(info) << "Terminate CoProc: " << c_->id();
     kill(c_->id(), SIGTERM);
     mon_->try_join_for(boost::chrono::seconds(10));
+    mon_.reset(nullptr);
+}
+
+VmCoProcSimple::~VmCoProcSimple() {
+    Stop();
 }
 
 const char *kRpmbData = "RPMB_DATA";
@@ -79,16 +86,24 @@ void VmCoProcRpmb::Run(void) {
     }
     cmd_ = bin_ + " --dev " + data_dir_ + "/" + kRpmbData + " --sock " + data_dir_ + "/" + kRpmbSock;
 
-    mon_ = std::make_unique<boost::thread>([this] { ThreadMon(); });
+    VmCoProcSimple::Run();
 }
 
 void VmCoProcRpmb::Stop(void) {
-    LOG(info) << "Terminate Rpmb Proc: " << c_->id();
-    kill(c_->id(), SIGTERM);
-    mon_->try_join_for(boost::chrono::seconds(10));
+    VmCoProcSimple::Stop();
+
+    /* TODO: this temp rpmb sock file is created by rpmb_dev, but rpmb_dev did not cleanup
+             when exit, so here check and remove the sock file after the rpmb_dev process
+             exited. Need to remove this block of code once the rpmb_dev fixed the issue.
+     */
     if (boost::filesystem::exists(data_dir_ + "/" + kRpmbSock)) {
+        LOG(info) << "Cleanup Rpmb CoProc stuff ...";
         boost::filesystem::remove(data_dir_ + "/" + kRpmbSock);
     }
+}
+
+VmCoProcRpmb::~VmCoProcRpmb() {
+    Stop();
 }
 
 }  //  namespace vm_manager

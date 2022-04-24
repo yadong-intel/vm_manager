@@ -36,14 +36,19 @@ class VmCoProcSimple : public VmProcess {
                     cmd_(cmd), env_data_(env) {}
     virtual void Run(void);
     virtual void Stop(void);
-    virtual ~VmCoProcSimple() = default;
+    virtual ~VmCoProcSimple();
  protected:
+    VmCoProcSimple(const VmCoProcSimple&) = delete;
+    VmCoProcSimple& operator=(const VmCoProcSimple&) = delete;
+
     void ThreadMon(void);
 
     std::string cmd_;
     std::vector<std::string> env_data_;
-    std::unique_ptr<boost::thread> mon_;
+
     std::unique_ptr<boost::process::child> c_;
+ private:
+    std::unique_ptr<boost::thread> mon_;
 };
 
 class VmCoProcRpmb : public VmCoProcSimple {
@@ -53,9 +58,12 @@ class VmCoProcRpmb : public VmCoProcSimple {
 
     virtual void Run(void);
     void Stop(void);
-    ~VmCoProcRpmb() = default;
+    ~VmCoProcRpmb();
 
  private:
+    VmCoProcRpmb(const VmCoProcRpmb&) = delete;
+    VmCoProcRpmb& operator=(const VmCoProcRpmb&) = delete;
+
     std::string bin_;
     std::string data_dir_;
 };

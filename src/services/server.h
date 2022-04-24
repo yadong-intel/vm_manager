@@ -35,13 +35,13 @@ class Server final {
     size_t FindVmInstance(std::string name);
 
     int StartVm(const char payload[]);
-    int ShutdownVm(const char payload[]);
+    int StopVm(const char payload[]);
 
     void Accept();
 
     void AsyncWaitSignal(void);
 
-    bool stop_server = false;
+    bool stop_server_ = false;
 
     CivMsgSync *sync_;
 
