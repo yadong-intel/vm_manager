@@ -1,4 +1,4 @@
-name: VM Manager Release
+name: VM Manager Upload Rlease
 
 on:
   release:
