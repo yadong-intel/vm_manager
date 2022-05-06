@@ -1,0 +1,13 @@
+Package: vm-manager-dbgsym
+Package-Type: ddeb
+Source: vm-manager
+Version: 0.5.0
+Auto-Built-Package: debug-symbols
+Architecture: amd64
+Maintainer: Qi, Yadong <yadong.qi@intel.com>
+Installed-Size: 113
+Depends: vm-manager (= 0.5.0)
+Section: debug
+Priority: optional
+Description: debug symbols for vm-manager
+Build-Ids: 184d975dbf78cac0b4894456453728c494d204a9
