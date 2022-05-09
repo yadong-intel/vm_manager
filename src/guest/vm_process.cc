@@ -102,7 +102,32 @@ void VmCoProcRpmb::Stop(void) {
     }
 }
 
+
+const char *kVtpmSock = "swtpm-sock";
+
 VmCoProcRpmb::~VmCoProcRpmb() {
+    Stop();
+}
+
+void VmCoProcVtpm::Run(void) {
+    LOG(info) << bin_ << " " << data_dir_;
+
+    if (!boost::filesystem::exists(data_dir_)) {
+        LOG(warning) << "Data path for Vtpm not exists!";
+        return;
+    }
+
+    cmd_ = bin_ + " socket --tpmstate dir=" + data_dir_ +
+           " --tpm2 --ctrl type=unixio,path=" + data_dir_ + "/" + kVtpmSock;
+
+    VmCoProcSimple::Run();
+}
+
+void VmCoProcVtpm::Stop(void) {
+    VmCoProcSimple::Stop();
+}
+
+VmCoProcVtpm::~VmCoProcVtpm() {
     Stop();
 }
 

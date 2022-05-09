@@ -55,6 +55,7 @@ constexpr char kDiskPath[] = "path";
 constexpr char kVgpuType[]    = "type";
 constexpr char kVgpuGvtgVer[] = "gvtg_version";
 constexpr char kVgpuUuid[]    = "vgpu_uuid";
+constexpr char kVgpuMonId[]    = "monitor";
 
 constexpr char kVtpmBinPath[] = "bin_path";
 constexpr char kVtpmDataDir[] = "data_dir";
@@ -64,8 +65,9 @@ constexpr char kRpmbDataDir[] = "data_dir";
 
 constexpr char kAafPath[] =    "path";
 constexpr char kAafSuspend[] = "support_suspend";
+constexpr char kAafAudioType[] = "audio_type";
 
-constexpr char kPciDev[] = "passthrough_pci";
+constexpr char kPciPtDev[] = "passthrough_pci";
 
 constexpr char kMedBattery[] = "battery_med";
 constexpr char kMedThermal[] = "thermal_med";
@@ -84,9 +86,11 @@ constexpr char kFirmSplited[] = "splited";
 
 constexpr char kVgpuNone[]   = "headless";
 constexpr char kVgpuVirtio[] = "virtio";
+constexpr char kVgpuVirtio2D[] = "virtio2d";
 constexpr char kVgpuRamfb[]  = "ramfb";
 constexpr char kVgpuGvtG[]   = "GVT-g";
 constexpr char kVgpuGvtD[]   = "GVT-d";
+constexpr char kVgpuSriov[] = "SRIOV";
 
 constexpr char kGvtgV51[] = "i915-GVTg_V5_1";
 constexpr char kGvtgV52[] = "i915-GVTg_V5_2";

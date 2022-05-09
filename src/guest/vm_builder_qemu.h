@@ -14,6 +14,7 @@
 #include <vector>
 #include <utility>
 #include <memory>
+#include <queue>
 
 #include <boost/ptr_container/ptr_vector.hpp>
 
@@ -26,18 +27,23 @@ class VmBuilderQemu : public VmBuilder {
  public:
     explicit VmBuilderQemu(std::string name, CivConfig cfg, std::vector<std::string> env) :
                        VmBuilder(name), cfg_(cfg), env_data_(env) {}
-    ~VmBuilderQemu() = default;
+    ~VmBuilderQemu();
     bool BuildVmArgs(void);
     void StartVm(void);
     void StopVm(void);
 
  private:
+    void soundcard_hook(void);
+    bool passthrough_gpu(void);
+    bool setup_sriov(void);
+
     CivConfig cfg_;
     uint32_t vsock_cid_;
     std::vector<std::unique_ptr<VmProcess>> co_procs_;
     std::string emul_cmd_;
     std::vector<std::string> env_data_;
-    boost::thread main_th_;
+    std::vector<std::string> pci_pt_dev_;
+    std::queue<std::function<void(void)>> end_call_;
 };
 
 }  // namespace vm_manager

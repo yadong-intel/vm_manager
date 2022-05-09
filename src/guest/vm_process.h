@@ -22,6 +22,7 @@ namespace vm_manager {
 
 extern const char *kRpmbData;
 extern const char *kRpmbSock;
+extern const char *kVtpmSock;
 
 class VmProcess {
  public:
@@ -63,6 +64,23 @@ class VmCoProcRpmb : public VmCoProcSimple {
  private:
     VmCoProcRpmb(const VmCoProcRpmb&) = delete;
     VmCoProcRpmb& operator=(const VmCoProcRpmb&) = delete;
+
+    std::string bin_;
+    std::string data_dir_;
+};
+
+class VmCoProcVtpm : public VmCoProcSimple {
+ public:
+    VmCoProcVtpm(std::string bin, std::string data_dir, std::vector<std::string> env) :
+          VmCoProcSimple("", env), bin_(bin), data_dir_(data_dir) {}
+
+    virtual void Run(void);
+    void Stop(void);
+    ~VmCoProcVtpm();
+
+ private:
+    VmCoProcVtpm(const VmCoProcVtpm&) = delete;
+    VmCoProcVtpm& operator=(const VmCoProcVtpm&) = delete;
 
     std::string bin_;
     std::string data_dir_;

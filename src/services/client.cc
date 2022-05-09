@@ -82,7 +82,6 @@ Client::Client() {
 
     client_shm_name_ = std::string("CivClientShm" + std::to_string(getpid()));
     boost::interprocess::permissions perm;
-    //unrestricted_permissions.set_unrestricted();
     perm.set_default();
     client_shm_ = boost::interprocess::managed_shared_memory(
             boost::interprocess::create_only,
