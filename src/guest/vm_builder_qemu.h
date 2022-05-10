@@ -12,6 +12,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 #include <utility>
 #include <memory>
 #include <queue>
@@ -33,16 +34,17 @@ class VmBuilderQemu : public VmBuilder {
     void StopVm(void);
 
  private:
-    void soundcard_hook(void);
-    bool passthrough_gpu(void);
-    bool setup_sriov(void);
+    void SoundCardHook(void);
+    bool PassthroughGpu(void);
+    void PassthroughPciDevices(void);
+    bool SetupSriov(void);
 
     CivConfig cfg_;
     uint32_t vsock_cid_;
     std::vector<std::unique_ptr<VmProcess>> co_procs_;
     std::string emul_cmd_;
     std::vector<std::string> env_data_;
-    std::vector<std::string> pci_pt_dev_;
+    std::set<std::string> pci_pt_dev_set_;
     std::queue<std::function<void(void)>> end_call_;
 };
 

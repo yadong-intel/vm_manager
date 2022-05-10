@@ -16,6 +16,7 @@
 #include <boost/uuid/string_generator.hpp>
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
 
 #include "guest/vm_builder.h"
 #include "guest/vm_builder_qemu.h"
@@ -30,6 +31,7 @@
 namespace vm_manager {
 constexpr const char *kPciDevicePath = "/sys/bus/pci/devices/";
 constexpr const char *kPciDriverPath = "/sys/bus/pci/drivers/";
+constexpr const char *kPciDriverProbe = "/sys/bus/pci/drivers_probe";
 
 constexpr const char *kIntelGpuBdf = "0000:00:02.0";
 constexpr const char *kIntelGpuDevPath = "/sys/bus/pci/devices/0000:00:02.0";
@@ -40,8 +42,9 @@ constexpr const char *kIntelGpuSriovTotalVfs = "/sys/bus/pci/devices/0000:00:02.
 constexpr const char *kIntelGpuSriovAutoProbe = "/sys/bus/pci/devices/0000:00:02.0/sriov_drivers_autoprobe";
 constexpr const char *kDrmCard0DevSriovNumVfs = "/sys/class/drm/card0/device/sriov_numvfs";
 
-constexpr const char *kVfioPciNewId = "/sys/bus/pci/drivers/vfio-pci/new_id";
+constexpr const char *kVfioPciNewId =    "/sys/bus/pci/drivers/vfio-pci/new_id";
 constexpr const char *kVfioPciRemoveId = "/sys/bus/pci/drivers/vfio-pci/remove_id";
+constexpr const char *kVfioPciUnbind =   "/sys/bus/pci/drivers/vfio-pci/unbind";
 
 constexpr const char *kGvtgMdevTypePath = "/sys/bus/pci/devices/mdev_supported_types/";
 constexpr const char *kGvtgMdevV51Path = "/sys/bus/pci/devices/mdev_supported_types/i915-GVTg_V5_1/";
@@ -52,7 +55,7 @@ constexpr const char *kGvtgMdevV58Path = "/sys/bus/pci/devices/mdev_supported_ty
 constexpr const char *kSys2MFreeHugePages = "/sys/kernel/mm/hugepages/hugepages-2048kB/free_hugepages";
 constexpr const char *kSys2MNrHugePages = "/sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages";
 
-static bool check_uuid(std::string uuid) {
+static bool CheckUuid(std::string uuid) {
     try {
         boost::uuids::string_generator gen;
         boost::uuids::uuid u = gen(uuid);
@@ -66,7 +69,7 @@ static bool check_uuid(std::string uuid) {
     }
 }
 
-void VmBuilderQemu::soundcard_hook(void) {
+void VmBuilderQemu::SoundCardHook(void) {
     /* FIXME: Remove the remove snd-tgl-snd module before
         graphics passthrough and inserts the module snd-tgl-snd at the
         end before exiting. When we unbind the i915 driver,
@@ -92,7 +95,7 @@ void VmBuilderQemu::soundcard_hook(void) {
     }
 }
 
-static bool is_vfio_driver(const char *path) {
+static bool IsVfioDriver(const char *path) {
     try {
         boost::filesystem::path p(path);
         if (boost::filesystem::is_symlink(p)) {
@@ -105,7 +108,7 @@ static bool is_vfio_driver(const char *path) {
     }
 }
 
-static int read_sys_file(const char *sys_file, std::ios_base::fmtflags base) {
+static int ReadSysFile(const char *sys_file, std::ios_base::fmtflags base) {
     try {
         std::ifstream ifs(sys_file, std::ios_base::in);
         ifs.setf(base, std::ios_base::basefield);
@@ -118,7 +121,7 @@ static int read_sys_file(const char *sys_file, std::ios_base::fmtflags base) {
     }
 }
 
-static int write_sys_file(const char *sys_file, const std::string &str) {
+static int WriteSysFile(const char *sys_file, const std::string &str) {
     try {
         std::ofstream of(sys_file, std::ios_base::out);
         of << str;
@@ -129,35 +132,7 @@ static int write_sys_file(const char *sys_file, const std::string &str) {
     }
 }
 
-bool VmBuilderQemu::passthrough_gpu(void) {
-    if (boost::process::system("modprobe vfio"))
-        return false;
-
-    if (boost::process::system("modprobe vfio-pci"))
-        return false;
-
-    /* Get device id */
-    int dev_id = read_sys_file(kIntelGpuDevice, std::ios_base::hex);
-
-    std::string id("8086 " + (boost::format("%x") % dev_id).str());
-
-    if (is_vfio_driver(kIntelGpuDriver)) {
-        write_sys_file(kVfioPciRemoveId, id);
-    }
-    write_sys_file(kIntelGpuDriverUnbind, kIntelGpuBdf);
-
-    int errno_saved = write_sys_file(kVfioPciNewId, id);
-    if (errno_saved == EEXIST) {
-        write_sys_file(kVfioPciRemoveId, id);
-        write_sys_file(kVfioPciNewId, id);
-    } else if (errno_saved != 0) {
-        return false;
-    }
-    pci_pt_dev_.emplace_back(kIntelGpuBdf);
-    return true;
-}
-
-static bool setup_hugepages(const std::string &mem_size) {
+static bool SetupHugePages(const std::string &mem_size) {
     if (mem_size.empty())
         return false;
 
@@ -188,22 +163,22 @@ static bool setup_hugepages(const std::string &mem_size) {
     }
 
     /* Get free Huge pages */
-    int free_hp = read_sys_file(kSys2MFreeHugePages, std::ios_base::dec);
+    int free_hp = ReadSysFile(kSys2MFreeHugePages, std::ios_base::dec);
 
     if (free_hp >= mem_mb/2)
         return true;
 
     /* Get nr hugepages */
-    int nr_hp = read_sys_file(kSys2MNrHugePages, std::ios_base::dec);
+    int nr_hp = ReadSysFile(kSys2MNrHugePages, std::ios_base::dec);
     int required_hp = nr_hp - free_hp + mem_mb/2;
 
     /* Try to allocate required huge pages */
-    write_sys_file(kSys2MNrHugePages, std::to_string(required_hp));
+    WriteSysFile(kSys2MNrHugePages, std::to_string(required_hp));
 
     /* check nr huge pages */
     while (nr_hp != required_hp) {
         int wait_cnt = 0;
-        nr_hp = read_sys_file(kSys2MNrHugePages, std::ios_base::dec);
+        nr_hp = ReadSysFile(kSys2MNrHugePages, std::ios_base::dec);
         if (wait_cnt < 200) {
             usleep(10000);
             wait_cnt++;
@@ -216,8 +191,8 @@ static bool setup_hugepages(const std::string &mem_size) {
     return true;
 }
 
-static int set_available_vf(void) {
-    int totalvfs = read_sys_file(kIntelGpuSriovTotalVfs, std::ios_base::dec);
+static int SetAvailableVf(void) {
+    int totalvfs = ReadSysFile(kIntelGpuSriovTotalVfs, std::ios_base::dec);
     if (totalvfs <= 0)
         return -1;
 
@@ -225,28 +200,28 @@ static int set_available_vf(void) {
     if (totalvfs > 4) {
         totalvfs = 4;
         /* Re-Probe SRIOV with limited VFs */
-        write_sys_file(kIntelGpuSriovAutoProbe, "0");
-        write_sys_file(kDrmCard0DevSriovNumVfs, std::to_string(totalvfs));
-        write_sys_file(kIntelGpuSriovAutoProbe, "1");
+        WriteSysFile(kIntelGpuSriovAutoProbe, "0");
+        WriteSysFile(kDrmCard0DevSriovNumVfs, std::to_string(totalvfs));
+        WriteSysFile(kIntelGpuSriovAutoProbe, "1");
     }
 
-    int dev_id = read_sys_file(kIntelGpuDevice, std::ios_base::hex);
+    int dev_id = ReadSysFile(kIntelGpuDevice, std::ios_base::hex);
     if (dev_id < 0)
         return -1;
 
     std::string id("8086 " + (boost::format("%x") % dev_id).str());
 
-    write_sys_file(kVfioPciNewId, id);
+    WriteSysFile(kVfioPciNewId, id);
 
-    if (is_vfio_driver(kIntelGpuDriver)) {
-        write_sys_file(kVfioPciRemoveId, id);
+    if (IsVfioDriver(kIntelGpuDriver)) {
+        WriteSysFile(kVfioPciRemoveId, id);
     }
-    write_sys_file(kIntelGpuDriverUnbind, kIntelGpuBdf);
+    WriteSysFile(kIntelGpuDriverUnbind, kIntelGpuBdf);
 
-    int errno_saved = write_sys_file(kVfioPciNewId, id);
+    int errno_saved = WriteSysFile(kVfioPciNewId, id);
     if (errno_saved == EEXIST) {
-        write_sys_file(kVfioPciRemoveId, id);
-        write_sys_file(kVfioPciNewId, id);
+        WriteSysFile(kVfioPciRemoveId, id);
+        WriteSysFile(kVfioPciNewId, id);
     } else if (errno_saved != 0) {
         return false;
     }
@@ -254,7 +229,7 @@ static int set_available_vf(void) {
     std::string sriov_dev(kIntelGpuDevPath);
     for (int i = 0; i < totalvfs; i++) {
         sriov_dev.append("." + std::to_string(i) + "/enable");
-        int status = read_sys_file(sriov_dev.c_str(), std::ios_base::dec);
+        int status = ReadSysFile(sriov_dev.c_str(), std::ios_base::dec);
         if (status == 0)
             return i;
     }
@@ -262,7 +237,7 @@ static int set_available_vf(void) {
     return -1;
 }
 
-bool VmBuilderQemu::setup_sriov(void) {
+bool VmBuilderQemu::SetupSriov(void) {
     std::string vgpu_mon_id = cfg_.GetValue(kGroupVgpu, kVgpuMonId);
     if (vgpu_mon_id.empty()) {
         emul_cmd_.append(" -display gtk,gl=on");
@@ -273,9 +248,9 @@ bool VmBuilderQemu::setup_sriov(void) {
     std::string mem_size = cfg_.GetValue(kGroupMem, kMemSize);
     boost::trim(mem_size);
 
-    if (!setup_hugepages(mem_size))
+    if (!SetupHugePages(mem_size))
         return false;
-    int vf = set_available_vf();
+    int vf = SetAvailableVf();
     if (vf < 0)
         return false;
 
@@ -285,6 +260,110 @@ bool VmBuilderQemu::setup_sriov(void) {
                     " -machine memory-backend=mem_sriov");
 
     return true;
+}
+
+enum PciPassthroughAction {
+    kPciPassthrough,
+    kPciRestore
+};
+
+static bool PassthroughOnePciDev(const char *pci_id, PciPassthroughAction action) {
+    if (!pci_id)
+        return false;
+
+    boost::filesystem::path p(kPciDevicePath);
+    p.append(pci_id).append("/iommu_group/device");
+
+    if (!boost::filesystem::exists(p) || boost::filesystem::is_directory(p)) {
+        return false;
+    }
+
+    for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(p)) {
+        std::cout << "  " << x.path() << "\n";
+        std::string str_dev(x.path().string() + "/device");
+        int device = ReadSysFile(str_dev.c_str(), std::ios_base::hex);
+        std::string str_ven(x.path().string() + "/vendor");
+        int vendor = ReadSysFile(str_ven.c_str(), std::ios_base::hex);
+        std::string ven_dev(std::to_string(vendor) + " " + std::to_string(device));
+
+        boost::filesystem::path driver(x.path().string() + "/driver");
+
+        if (action == kPciRestore) {
+            if (IsVfioDriver(driver.c_str())) {
+                WriteSysFile(kVfioPciRemoveId, ven_dev);
+                WriteSysFile(kVfioPciUnbind, x.path().filename().string());
+            }
+            /* TODO: check whether unbind successfully instead of sleep */
+            sleep(1);
+
+            if (WriteSysFile(kPciDriverProbe, x.path().filename().string()))
+                return false;
+            continue;
+        }
+
+        if (boost::filesystem::exists(driver)) {
+            if (IsVfioDriver(driver.c_str())) {
+                WriteSysFile(kVfioPciRemoveId, ven_dev);
+            }
+            std::string drv_unbind = driver.string() + "/unbind";
+            WriteSysFile(kVfioPciUnbind, x.path().filename().string());
+
+            /* TODO: check whether unbind successfully instead of sleep */
+            sleep(1);
+
+            int errno_saved = WriteSysFile(kVfioPciNewId, ven_dev);
+            if (errno_saved == EEXIST) {
+                WriteSysFile(kVfioPciRemoveId, ven_dev);
+                WriteSysFile(kVfioPciNewId, ven_dev);
+            } else if (errno_saved != 0) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+void VmBuilderQemu::PassthroughPciDevices(void) {
+    std::string pt_pci = cfg_.GetValue(kGroupPciPt, kPciPtDev);
+    boost::trim(pt_pci);
+    if (pt_pci.empty())
+        return;
+
+    std::vector<std::string> vec;
+    boost::split(vec, pt_pci, boost::is_any_of(","), boost::token_compress_on);
+
+    if (boost::process::system("modprobe vfio"))
+        return;
+
+    if (boost::process::system("modprobe vfio-pci"))
+        return;
+
+    for (auto it=vec.begin(); it != vec.end(); ++it) {
+        boost::trim(*it);
+        if (PassthroughOnePciDev(it->c_str(), kPciPassthrough)) {
+            pci_pt_dev_set_.insert(std::move(*it)); //Need to check whether need to shift it after move it
+            emul_cmd_.append(" -device vfio-pci,host=" + *it + ",x-no-kvm-intx=on");
+        }
+    }
+
+    if (pci_pt_dev_set_.empty())
+        return;
+
+    end_call_.emplace([this](){
+        LOG(info) << "Restore passthroughed PCI devices ...";
+        for (auto it=pci_pt_dev_set_.begin(); it != pci_pt_dev_set_.end(); ++it) {
+            PassthroughOnePciDev(it->c_str(), kPciRestore);
+        }
+    });
+}
+
+bool VmBuilderQemu::PassthroughGpu(void) {
+    if (PassthroughOnePciDev(kIntelGpuBdf, kPciPassthrough)) {
+        pci_pt_dev_set_.insert(kIntelGpuBdf);
+        return true;
+    }
+    return false;
 }
 
 bool VmBuilderQemu::BuildVmArgs(void) {
@@ -409,7 +488,7 @@ bool VmBuilderQemu::BuildVmArgs(void) {
                 LOG(error) << "Empty VGPU UUID!";
                 return false;
             }
-            if (!check_uuid(vgpu_uuid)) {
+            if (!CheckUuid(vgpu_uuid)) {
                 return false;
             }
             emul_cmd_.append(" -display gtk,gl=on");
@@ -417,8 +496,8 @@ bool VmBuilderQemu::BuildVmArgs(void) {
                              std::string(kIntelGpuDevPath) + vgpu_uuid);
             aaf_cfg->Set(kAafKeyGpuType, "gvtg");
         } else if (vgpu_type.compare(kVgpuGvtD)) {
-            soundcard_hook();
-            if (!passthrough_gpu()) {
+            SoundCardHook();
+            if (!PassthroughGpu()) {
                 return false;
             }
             emul_cmd_.append(" -vga none -nographic"
@@ -433,7 +512,7 @@ bool VmBuilderQemu::BuildVmArgs(void) {
             emul_cmd_.append(" -display gtk,gl=on -device virtio-vga");
             aaf_cfg->Set(kAafKeyGpuType, "virtio");
         } else if (vgpu_type.compare(kVgpuSriov)) {
-            if (!setup_sriov())
+            if (!SetupSriov())
                 return false;
             aaf_cfg->Set(kAafKeyGpuType, "virtio");
         } else {
@@ -462,7 +541,7 @@ bool VmBuilderQemu::BuildVmArgs(void) {
         ",if=none,id=disk1,discard=unmap,detect-zeroes=unmap"
         "-device virtio-blk-pci,drive=disk1,bootindex=1");
 
-    std::string pt_pci = cfg_.GetValue(kGroupPciPt, kPciPtDev);
+    PassthroughPciDevices();
 
     aaf_cfg->Flush();
 
