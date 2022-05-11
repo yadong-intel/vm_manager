@@ -21,6 +21,7 @@
 
 #include "guest/config_parser.h"
 #include "guest/vm_builder.h"
+#include "guest/aaf.h"
 
 namespace vm_manager {
 
@@ -34,13 +35,37 @@ class VmBuilderQemu : public VmBuilder {
     void StopVm(void);
 
  private:
+    bool BuildEmulPath(void);
+    void BuildFixedCmd(void);
+    bool BuildNameQmp(void);
+    void BuildNetCmd(void);
+    bool BuildVsockCmd(void);
+    void BuildRpmbCmd(void);
+    void BuildVtpmCmd(void);
+    void BuildAafCfg(void);
+    bool BuildVgpuCmd(void);
+    void BuildMemCmd(void);
+    void BuildVcpuCmd(void);
+    bool BuildFirmwareCmd(void);
+    void BuildVdiskCmd(void);
+    void BuildPtPciDevicesCmd(void);
+    void BuildGuestTimeKeepCmd(void);
+    void BuildGuestPmCtrlCmd(void);
+    void BuildAudioCmd(void);
+    void BuildExtraCmd(void);
+
     void SoundCardHook(void);
     bool PassthroughGpu(void);
-    void PassthroughPciDevices(void);
+
+    void SetPciDevicesCallback(void);
     bool SetupSriov(void);
+    void RunMediationSrv(void);
+    void SetExtraServices(void);
 
     CivConfig cfg_;
+    std::unique_ptr<Aaf> aaf_cfg_;
     uint32_t vsock_cid_;
+    std::unique_ptr<VmProcess> main_proc_;
     std::vector<std::unique_ptr<VmProcess>> co_procs_;
     std::string emul_cmd_;
     std::vector<std::string> env_data_;

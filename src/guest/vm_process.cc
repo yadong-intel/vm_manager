@@ -69,6 +69,12 @@ void VmCoProcSimple::Stop(void) {
     mon_.reset(nullptr);
 }
 
+bool VmCoProcSimple::Running(void) {
+    if (c_)
+        return c_->running();
+    return false;
+}
+
 VmCoProcSimple::~VmCoProcSimple() {
     Stop();
 }

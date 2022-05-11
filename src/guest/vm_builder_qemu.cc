@@ -23,7 +23,7 @@
 #include "guest/config_parser.h"
 #include "guest/vsock_cid_pool.h"
 #include "guest/vm_process.h"
-#include "guest/aaf.h"
+
 #include "services/message.h"
 #include "utils/log.h"
 #include "utils/utils.h"
@@ -271,6 +271,12 @@ static bool PassthroughOnePciDev(const char *pci_id, PciPassthroughAction action
     if (!pci_id)
         return false;
 
+    if (boost::process::system("modprobe vfio"))
+        return false;
+
+    if (boost::process::system("modprobe vfio-pci"))
+        return false;
+
     boost::filesystem::path p(kPciDevicePath);
     p.append(pci_id).append("/iommu_group/device");
 
@@ -324,7 +330,7 @@ static bool PassthroughOnePciDev(const char *pci_id, PciPassthroughAction action
     return true;
 }
 
-void VmBuilderQemu::PassthroughPciDevices(void) {
+void VmBuilderQemu::BuildPtPciDevicesCmd(void) {
     std::string pt_pci = cfg_.GetValue(kGroupPciPt, kPciPtDev);
     boost::trim(pt_pci);
     if (pt_pci.empty())
@@ -333,23 +339,18 @@ void VmBuilderQemu::PassthroughPciDevices(void) {
     std::vector<std::string> vec;
     boost::split(vec, pt_pci, boost::is_any_of(","), boost::token_compress_on);
 
-    if (boost::process::system("modprobe vfio"))
-        return;
-
-    if (boost::process::system("modprobe vfio-pci"))
-        return;
-
     for (auto it=vec.begin(); it != vec.end(); ++it) {
         boost::trim(*it);
         if (PassthroughOnePciDev(it->c_str(), kPciPassthrough)) {
-            pci_pt_dev_set_.insert(std::move(*it)); //Need to check whether need to shift it after move it
+            pci_pt_dev_set_.insert(*it);
             emul_cmd_.append(" -device vfio-pci,host=" + *it + ",x-no-kvm-intx=on");
         }
     }
+}
 
+void VmBuilderQemu::SetPciDevicesCallback(void) {
     if (pci_pt_dev_set_.empty())
         return;
-
     end_call_.emplace([this](){
         LOG(info) << "Restore passthroughed PCI devices ...";
         for (auto it=pci_pt_dev_set_.begin(); it != pci_pt_dev_set_.end(); ++it) {
@@ -366,9 +367,79 @@ bool VmBuilderQemu::PassthroughGpu(void) {
     return false;
 }
 
-bool VmBuilderQemu::BuildVmArgs(void) {
-    LOG(info) << "build qemu vm args";
+void VmBuilderQemu::RunMediationSrv(void) {
+    std::string batt_med = cfg_.GetValue(kGroupMed, kMedBattery);
+    if (batt_med.empty())
+        return;
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(batt_med, env_data_));
 
+    std::string ther_med = cfg_.GetValue(kGroupMed, kMedThermal);
+    if (ther_med.empty())
+        return;
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(ther_med, env_data_));
+}
+
+void VmBuilderQemu::BuildGuestTimeKeepCmd(void) {
+    std::string tk = cfg_.GetValue(kGroupService, kServTimeKeep);
+    if (tk.empty())
+        return;
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(tk, env_data_));
+    emul_cmd_.append(" -qmp pipe:/tmp/qmp-time-keep-pipe");
+}
+
+void VmBuilderQemu::BuildGuestPmCtrlCmd(void) {
+    std::string pm = cfg_.GetValue(kGroupService, kServPmCtrl);
+    if (pm.empty())
+        return;
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(pm, env_data_));
+    emul_cmd_.append(" -qmp unix:/tmp/qmp-pm-sock,server=on,wait=off -no-reboot");
+}
+
+static int get_uid(void) {
+    char *suid = NULL;
+    int real_uid;
+    suid = getenv("SUDO_UID");
+    if (suid) {
+        real_uid = atoi(suid);
+    } else {
+        real_uid = getuid();
+    }
+    return real_uid;
+}
+
+void VmBuilderQemu::BuildAudioCmd(void) {
+    int uid = get_uid();
+    emul_cmd_.append(" -device intel-hda"
+                     " -device hda-duplex,audiodev=android_spk"
+                     " -audiodev id=android_spk,timer-period=5000,driver=pa,"
+                     "in.fixed-settings=off,out.fixed-settings=off,server=/var/run/pulse/native");
+}
+
+void VmBuilderQemu::BuildExtraCmd(void) {
+    std::string ex_cmd = cfg_.GetValue(kGroupExtra, kExtraCmd);
+    if (ex_cmd.empty())
+        return;
+    emul_cmd_.append(" " + ex_cmd);
+}
+
+void VmBuilderQemu::SetExtraServices(void) {
+    std::string ex_srvs = cfg_.GetValue(kGroupExtra, kExtraService);
+    boost::trim(ex_srvs);
+    if (ex_srvs.empty())
+        return;
+    std::vector<std::string> vec;
+    boost::split(vec, ex_srvs, boost::is_any_of(";"), boost::token_compress_on);
+
+    for (auto it=vec.begin(); it != vec.end(); ++it) {
+        boost::trim(*it);
+        if (it->empty())
+            continue;
+
+        co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(*it, env_data_));
+    }
+}
+
+bool VmBuilderQemu::BuildEmulPath(void) {
     std::string str_emul_path = cfg_.GetValue(kGroupEmul, kEmulPath);
     boost::filesystem::path emul_path;
     if (boost::filesystem::exists(str_emul_path)) {
@@ -384,8 +455,11 @@ bool VmBuilderQemu::BuildVmArgs(void) {
         return false;
     }
     emul_cmd_.assign(emul_path.c_str());
+    return true;
+}
 
-    const std::string fixed_args = (
+void VmBuilderQemu::BuildFixedCmd(void) {
+    emul_cmd_.append(
         " -M q35"
         " -machine kernel_irqchip=on"
         " -k en-us"
@@ -394,28 +468,36 @@ bool VmBuilderQemu::BuildVmArgs(void) {
         " -device qemu-xhci,id=xhci,p2=8,p3=8"
         " -device usb-mouse"
         " -device usb-kbd"
-        " -device e1000,netdev=net0"
         " -device intel-iommu,device-iotlb=on,caching-mode=on"
         " -nodefaults ");
-    emul_cmd_.append(fixed_args);
+}
 
+bool VmBuilderQemu::BuildNameQmp(void) {
     std::string vm_name = cfg_.GetValue(kGroupGlob, kGlobName);
+    boost::trim(vm_name);
     if (vm_name.empty()) {
         emul_cmd_.clear();
         return false;
     }
     emul_cmd_.append(" -name " + vm_name);
     emul_cmd_.append(" -qmp unix:" + std::string(GetConfigPath()) + "/." + vm_name + ".qmp.unix.socket,server,nowait");
+    return true;
+}
 
+void VmBuilderQemu::BuildNetCmd(void) {
     std::string net_arg = " -netdev user,id=net0";
     std::string adb_port = cfg_.GetValue(kGroupGlob, kGlobAdbPort);
     if (!adb_port.empty())
         net_arg.append(",hostfwd=tcp::" + adb_port + "-:5555");
     std::string fb_port = cfg_.GetValue(kGroupGlob, kGlobFastbootPort);
     if (!fb_port.empty())
-        net_arg.append(",hostfwd=tcp::" + adb_port + "-:5554");
+        net_arg.append(",hostfwd=tcp::" + fb_port + "-:5554");
     emul_cmd_.append(net_arg);
 
+    emul_cmd_.append(" -device e1000,netdev=net0,bus=pcie.0,addr=0xA");
+}
+
+bool VmBuilderQemu::BuildVsockCmd(void) {
     std::string str_cid = cfg_.GetValue(kGroupGlob, kGlobCid);
     if (str_cid.empty()) {
         vsock_cid_ = VsockCidPool::Pool().GetCid();
@@ -437,9 +519,12 @@ bool VmBuilderQemu::BuildVmArgs(void) {
             return false;
         }
     }
-    emul_cmd_.append(" -device vhost-vsock-pci,id=vhost-vsock-pci0,bus=pcie.0,addr=0x20,guest-cid=" +
+    emul_cmd_.append(" -device vhost-vsock-pci,id=vhost-vsock-pci0,bus=pcie.0,addr=0x10,guest-cid=" +
                     std::to_string(vsock_cid_));
+    return true;
+}
 
+void VmBuilderQemu::BuildRpmbCmd(void) {
     std::string rpmb_bin = cfg_.GetValue(kGroupRpmb, kRpmbBinPath);
     std::string rpmb_data = cfg_.GetValue(kGroupRpmb, kRpmbDataDir);
     if (!rpmb_bin.empty() && !rpmb_data.empty()) {
@@ -449,11 +534,9 @@ bool VmBuilderQemu::BuildVmArgs(void) {
                            rpmb_data + "/" + std::string(kRpmbSock));
     }
     co_procs_.emplace_back(std::make_unique<VmCoProcRpmb>(std::move(rpmb_bin), std::move(rpmb_data), env_data_));
+}
 
-    //co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(" qemu-system-x86_64 -device virtio-gpu", env_data_));
-    //co_procs_.emplace_back(std::make_unique<VmCoProcSimple>("  qemu-system-x86_64 -device virtio-gpu", env_data_));
-
-
+void VmBuilderQemu::BuildVtpmCmd(void) {
     std::string vtpm_bin = cfg_.GetValue(kGroupVtpm, kVtpmBinPath);
     std::string vtpm_data = cfg_.GetValue(kGroupVtpm, kVtpmDataDir);
     if (!vtpm_bin.empty() && !vtpm_data.empty()) {
@@ -462,27 +545,30 @@ bool VmBuilderQemu::BuildVmArgs(void) {
                          " -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-crb,tpmdev=tpm0");
     }
     co_procs_.emplace_back(std::make_unique<VmCoProcVtpm>(std::move(vtpm_bin), std::move(vtpm_data), env_data_));
+}
 
-    std::unique_ptr<Aaf> aaf_cfg;
+void VmBuilderQemu::BuildAafCfg(void) {
     std::string aaf_path = cfg_.GetValue(kGroupAaf, kAafPath);
     if (!aaf_path.empty()) {
         emul_cmd_.append(" -virtfs local,mount_tag=Download9p,security_model=none,addr=3,path=" + aaf_path);
-        aaf_cfg = std::make_unique<Aaf>(aaf_path.c_str());
+        aaf_cfg_ = std::make_unique<Aaf>(aaf_path.c_str());
 
         std::string aaf_suspend = cfg_.GetValue(kGroupAaf, kAafSuspend);
         if (!aaf_suspend.empty()) {
-            aaf_cfg->Set(kAafKeySuspend, aaf_suspend);
+            aaf_cfg_->Set(kAafKeySuspend, aaf_suspend);
         }
 
         std::string aaf_audio_type = cfg_.GetValue(kGroupAaf, kAafAudioType);
         if (!aaf_audio_type.empty()) {
-            aaf_cfg->Set(kAafKeyAudioType, aaf_audio_type);
+            aaf_cfg_->Set(kAafKeyAudioType, aaf_audio_type);
         }
     }
+}
 
+bool VmBuilderQemu::BuildVgpuCmd(void) {
     std::string vgpu_type = cfg_.GetValue(kGroupVgpu, kVgpuType);
     if (!vgpu_type.empty()) {
-        if (vgpu_type.compare(kVgpuGvtG)) {
+        if (vgpu_type.compare(kVgpuGvtG) == 0) {
             std::string vgpu_uuid = cfg_.GetValue(kGroupVgpu, kVgpuUuid);
             if (vgpu_uuid.empty()) {
                 LOG(error) << "Empty VGPU UUID!";
@@ -494,56 +580,122 @@ bool VmBuilderQemu::BuildVmArgs(void) {
             emul_cmd_.append(" -display gtk,gl=on");
             emul_cmd_.append(" -device vfio-pci-nohotplug,ramfb=on,display=on,addr=2.0,x-igd-opregion=on,sysfsdev=" +
                              std::string(kIntelGpuDevPath) + vgpu_uuid);
-            aaf_cfg->Set(kAafKeyGpuType, "gvtg");
-        } else if (vgpu_type.compare(kVgpuGvtD)) {
+            if (aaf_cfg_)
+                aaf_cfg_->Set(kAafKeyGpuType, "gvtg");
+        } else if (vgpu_type.compare(kVgpuGvtD) == 0) {
             SoundCardHook();
             if (!PassthroughGpu()) {
                 return false;
             }
             emul_cmd_.append(" -vga none -nographic"
                 " -device vfio-pci,host=00:02.0,x-igd-gms=2,id=hostdev0,bus=pcie.0,addr=0x2,x-igd-opregion=on");
-            aaf_cfg->Set(kAafKeyGpuType, "gvtd");
-        } else if (vgpu_type.compare(kVgpuVirtio)) {
+            if (aaf_cfg_)
+                aaf_cfg_->Set(kAafKeyGpuType, "gvtd");
+        } else if (vgpu_type.compare(kVgpuVirtio) == 0) {
             emul_cmd_.append(" -display gtk,gl=on -device virtio-vga-gl");
-            aaf_cfg->Set(kAafKeyGpuType, "virtio");
-        } else if (vgpu_type.compare(kVgpuRamfb)) {
+            if (aaf_cfg_)
+                aaf_cfg_->Set(kAafKeyGpuType, "virtio");
+        } else if (vgpu_type.compare(kVgpuRamfb) == 0) {
             emul_cmd_.append(" -display gtk,gl=on -device ramfb");
         } else if (vgpu_type.compare(kVgpuVirtio2D)) {
             emul_cmd_.append(" -display gtk,gl=on -device virtio-vga");
-            aaf_cfg->Set(kAafKeyGpuType, "virtio");
-        } else if (vgpu_type.compare(kVgpuSriov)) {
+            if (aaf_cfg_)
+                aaf_cfg_->Set(kAafKeyGpuType, "virtio");
+        } else if (vgpu_type.compare(kVgpuSriov) == 0) {
             if (!SetupSriov())
                 return false;
-            aaf_cfg->Set(kAafKeyGpuType, "virtio");
+            if (aaf_cfg_)
+                aaf_cfg_->Set(kAafKeyGpuType, "virtio");
         } else {
             LOG(warning) << "Invalid Graphics config";
             return false;
         }
     }
+    return true;
+}
 
+void VmBuilderQemu::BuildMemCmd(void) {
     emul_cmd_.append(" -m " + cfg_.GetValue(kGroupMem, kMemSize));
+}
 
+void VmBuilderQemu::BuildVcpuCmd(void) {
     emul_cmd_.append(" -smp " + cfg_.GetValue(kGroupVcpu, kVcpuNum));
+}
 
+bool VmBuilderQemu::BuildFirmwareCmd(void) {
     std::string firm_type = cfg_.GetValue(kGroupFirm, kFirmType);
     if (firm_type.empty())
         return false;
-    if (firm_type.compare(kFirmUnified)) {
-        emul_cmd_.append(" -drive if=pflash,format=raw,file=" + cfg_.GetValue(kGroupFirm, kFirmUnified));
-    } else if (firm_type.compare(kFirmSplited)) {
+    if (firm_type.compare(kFirmUnified) == 0) {
+        emul_cmd_.append(" -drive if=pflash,format=raw,file=" + cfg_.GetValue(kGroupFirm, kFirmPath));
+    } else if (firm_type.compare(kFirmSplited) == 0) {
         emul_cmd_.append(" -drive if=pflash,format=raw,readonly,file=" + cfg_.GetValue(kGroupFirm, kFirmCode));
         emul_cmd_.append(" -drive if=pflash,format=raw,file=" + cfg_.GetValue(kGroupFirm, kFirmVars));
     } else {
         LOG(error) << "Invalid virtual firmware";
+        return false;
     }
+    return true;
+}
 
-    emul_cmd_.append(" -drive file="+ cfg_.GetValue(kGroupDisk, kDiskPath) +
-        ",if=none,id=disk1,discard=unmap,detect-zeroes=unmap"
-        "-device virtio-blk-pci,drive=disk1,bootindex=1");
+void VmBuilderQemu::BuildVdiskCmd(void) {
+    emul_cmd_.append(
+        " -drive file="+ cfg_.GetValue(kGroupDisk, kDiskPath) + ",if=none,id=disk1,discard=unmap,detect-zeroes=unmap"
+        " -device virtio-blk-pci,drive=disk1,bootindex=1");
+}
 
-    PassthroughPciDevices();
+bool VmBuilderQemu::BuildVmArgs(void) {
+    LOG(info) << "build qemu vm args";
 
-    aaf_cfg->Flush();
+    if (!BuildEmulPath())
+        return false;
+
+    BuildFixedCmd();
+
+    if (!BuildNameQmp())
+        return false;
+
+    BuildNetCmd();
+
+    if (!BuildVsockCmd())
+        return false;
+
+    BuildRpmbCmd();
+
+    BuildVtpmCmd();
+
+    if (!BuildVgpuCmd())
+        return false;
+
+    BuildMemCmd();
+
+    BuildVcpuCmd();
+
+    if (!BuildFirmwareCmd())
+        return false;
+
+    BuildVdiskCmd();
+
+    BuildPtPciDevicesCmd();
+    SetPciDevicesCallback();
+
+    RunMediationSrv();
+
+    BuildGuestTimeKeepCmd();
+
+    BuildGuestPmCtrlCmd();
+
+    BuildAudioCmd();
+
+    BuildExtraCmd();
+
+    SetExtraServices();
+
+    if (aaf_cfg_)
+        aaf_cfg_->Flush();
+
+    //main_proc_ = std::make_unique<VmCoProcSimple>(" qemu-system-x86_64 -device virtio-gpu", env_data_);
+    main_proc_ = std::make_unique<VmCoProcSimple>(emul_cmd_, env_data_);
 
     return true;
 }
@@ -552,14 +704,22 @@ void VmBuilderQemu::StartVm() {
     LOG(info) << "Emulator command:" << emul_cmd_;
 
     for (size_t i = 0; i < co_procs_.size(); ++i) {
-        co_procs_[i]->Run();
+        if (!co_procs_[i]->Running())
+            co_procs_[i]->Run();
     }
+
+    if (main_proc_)
+        main_proc_->Run();
 }
 
 void VmBuilderQemu::StopVm() {
     for (size_t i = 0; i < co_procs_.size(); ++i) {
         co_procs_[i]->Stop();
     }
+
+    if (main_proc_)
+        main_proc_->Stop();
+
     while (!end_call_.empty()) {
         end_call_.front()();
         end_call_.pop();

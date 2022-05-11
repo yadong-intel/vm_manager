@@ -28,6 +28,7 @@ class VmProcess {
  public:
     virtual void Run(void) = 0;
     virtual void Stop(void) = 0;
+    virtual bool Running(void) = 0;
     virtual ~VmProcess() = default;
 };
 
@@ -37,6 +38,7 @@ class VmCoProcSimple : public VmProcess {
                     cmd_(cmd), env_data_(env) {}
     virtual void Run(void);
     virtual void Stop(void);
+    bool Running(void);
     virtual ~VmCoProcSimple();
  protected:
     VmCoProcSimple(const VmCoProcSimple&) = delete;
