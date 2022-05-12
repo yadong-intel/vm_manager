@@ -42,6 +42,14 @@ size_t Server::FindVmInstance(std::string name) {
     return -1;
 }
 
+void Server::DeleteVmInstance(std::string name) {
+    std::scoped_lock lock(vmis_mutex_);
+    int index = FindVmInstance(name);
+    if (index == -1)
+        return;
+    vmis_.erase(vmis_.begin() + index);
+}
+
 int Server::StopVm(const char payload[]) {
     boost::interprocess::managed_shared_memory shm(
         boost::interprocess::open_only,
@@ -51,11 +59,28 @@ int Server::StopVm(const char payload[]) {
     int id = FindVmInstance(std::string(vm_name.first->c_str()));
     if (id != -1) {
         vmis_[id]->StopVm();
-        vmis_.erase(vmis_.begin() + id);
     }
     if (id == -1)
         LOG(warning) << "CiV: " << vm_name.first->c_str() << " is not running!";
     return 0;
+}
+
+void Server::VmThread(VmBuilder *vb) {
+    if (!vb)
+        return;
+
+    /* Build VM releated Arguments */
+    if (!vb->BuildVmArgs())
+        return;
+
+    LOG(info) << "Starting VM:  " << vb->GetName();
+    /* Start VM */
+    vb->StartVm();
+
+    /* Wait VM to exit */
+    vb->WaitVm();
+
+    DeleteVmInstance(vb->GetName());
 }
 
 int Server::StartVm(const char payload[]) {
@@ -64,10 +89,16 @@ int Server::StartVm(const char payload[]) {
         payload);
 
     auto vm_name = shm.find<bstring>("StartVmName");
-    std::string cfg_file = GetConfigPath() + std::string("/") + vm_name.first->c_str() + ".ini";
-
     if (FindVmInstance(std::string(vm_name.first->c_str())) != -1UL) {
         LOG(warning) << "CiV: " << vm_name.first->c_str() << " is already running!";
+        return -1;
+    }
+
+    std::string cfg_file = GetConfigPath() + std::string("/") + vm_name.first->c_str() + ".ini";
+
+    CivConfig cfg;
+    if (!cfg.ReadConfigFile(cfg_file)) {
+        LOG(error) << "Failed to read config file";
         return -1;
     }
 
@@ -76,12 +107,6 @@ int Server::StartVm(const char payload[]) {
 
     for (int i = 0; i < vm_env.second; i++) {
         env_data.push_back(std::string(vm_env.first[i].c_str()));
-    }
-
-    CivConfig cfg;
-    if (!cfg.ReadConfigFile(cfg_file)) {
-        LOG(error) << "Failed to read config file";
-        return -1;
     }
 
     std::vector<std::unique_ptr<VmBuilder>>::iterator vmi;
@@ -93,8 +118,13 @@ int Server::StartVm(const char payload[]) {
         vmi = vmis_.emplace(vmis_.end(),
                     std::make_unique<VmBuilderQemu>(vm_name.first->c_str(), std::move(cfg), std::move(env_data)));
     }
-    vmi->get()->BuildVmArgs();
-    vmi->get()->StartVm();
+
+    VmBuilder *vb = vmi->get();
+    boost::thread t([this, vb]() {
+        VmThread(vb);
+    });
+
+    t.detach();
 
     return 0;
 }
@@ -140,12 +170,21 @@ void Server::Start(void) {
             switch (data.first->type) {
                 case kCiVMsgStopServer:
                     stop_server_ = true;
+                    data.first->type = kCivMsgRespondSuccess;
                     break;
                 case kCivMsgStartVm:
-                    StartVm(data.first->payload);
+                    if (StartVm(data.first->payload) == 0) {
+                        data.first->type = kCivMsgRespondSuccess;
+                    } else {
+                        data.first->type = kCivMsgRespondFail;
+                    }
                     break;
                 case kCivMsgStopVm:
-                    StopVm(data.first->payload);
+                    if (StopVm(data.first->payload) == 0) {
+                        data.first->type = kCivMsgRespondSuccess;
+                    } else {
+                        data.first->type = kCivMsgRespondFail;
+                    }
                     break;
                 case kCivMsgTest:
                     break;

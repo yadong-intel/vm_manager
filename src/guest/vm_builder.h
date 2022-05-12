@@ -29,8 +29,9 @@ class VmBuilder {
     virtual ~VmBuilder() = default;
     virtual bool BuildVmArgs(void) = 0;
     virtual void StartVm(void) = 0;
+    virtual void WaitVm(void) = 0;
     virtual void StopVm(void) = 0;
-    std::string GetName(void) { return name_; }
+    std::string GetName(void);
  protected:
     std::string name_;
 };

@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2022 Intel Corporation.
  * All rights reserved.
@@ -33,9 +32,12 @@ class Server final {
     Server& operator=(const Server&) = delete;
 
     size_t FindVmInstance(std::string name);
+    void DeleteVmInstance(std::string name);
 
     int StartVm(const char payload[]);
     int StopVm(const char payload[]);
+
+    void VmThread(VmBuilder *vb);
 
     void Accept();
 
@@ -46,6 +48,7 @@ class Server final {
     CivMsgSync *sync_;
 
     std::vector<std::unique_ptr<VmBuilder>> vmis_;
+    std::mutex vmis_mutex_;
 };
 
 }  // namespace vm_manager

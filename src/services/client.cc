@@ -70,11 +70,12 @@ bool Client::Notify(CivMsgType t) {
     sync.first->cond_s.notify_one();
 
     sync.first->cond_c.wait(lock_cond);
+    int ret = data->type == kCivMsgRespondSuccess ? true : false;
 
     server_shm_.destroy<CivMsg>(kCivServerObjData);
     server_shm_.zero_free_memory();
 
-    return true;
+    return ret;
 }
 
 Client::Client() {
@@ -82,7 +83,7 @@ Client::Client() {
 
     client_shm_name_ = std::string("CivClientShm" + std::to_string(getpid()));
     boost::interprocess::permissions perm;
-    perm.set_default();
+    perm.set_unrestricted();
     client_shm_ = boost::interprocess::managed_shared_memory(
             boost::interprocess::create_only,
             client_shm_name_.c_str(),

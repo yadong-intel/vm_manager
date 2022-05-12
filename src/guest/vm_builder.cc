@@ -17,6 +17,7 @@
 #include "utils/utils.h"
 
 namespace vm_manager {
-
-
+    std::string VmBuilder::GetName(void) {
+        return name_;
+    }
 }  //  namespace vm_manager

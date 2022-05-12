@@ -12,6 +12,7 @@ cmake_minimum_required(VERSION 3.10)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(BoostCMake)
 include(FTXUICMake)
+include(gRPCCMake)
 
 set(PROJECT_NAME "vm-manager")
 project(${PROJECT_NAME})

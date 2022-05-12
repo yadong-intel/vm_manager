@@ -60,9 +60,23 @@ void VmCoProcSimple::Run(void) {
     mon_ = std::make_unique<boost::thread>([this] { ThreadMon(); });
 }
 
+void VmCoProcSimple::Join(void) {
+    if (!mon_)
+        return;
+    if (mon_->joinable())
+        mon_->join();
+}
+
 void VmCoProcSimple::Stop(void) {
+    if (!mon_ || !c_)
+        return;
+
     if (!mon_.get())
         return;
+
+    if (!c_->running())
+        return;
+
     LOG(info) << "Terminate CoProc: " << c_->id();
     kill(c_->id(), SIGTERM);
     mon_->try_join_for(boost::chrono::seconds(10));

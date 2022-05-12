@@ -29,6 +29,7 @@ class VmProcess {
     virtual void Run(void) = 0;
     virtual void Stop(void) = 0;
     virtual bool Running(void) = 0;
+    virtual void Join(void) = 0;
     virtual ~VmProcess() = default;
 };
 
@@ -36,9 +37,10 @@ class VmCoProcSimple : public VmProcess {
  public:
     VmCoProcSimple(std::string cmd, std::vector<std::string> env) :
                     cmd_(cmd), env_data_(env) {}
-    virtual void Run(void);
-    virtual void Stop(void);
+    void Run(void);
+    void Stop(void);
     bool Running(void);
+    void Join(void);
     virtual ~VmCoProcSimple();
  protected:
     VmCoProcSimple(const VmCoProcSimple&) = delete;
@@ -59,7 +61,7 @@ class VmCoProcRpmb : public VmCoProcSimple {
     VmCoProcRpmb(std::string bin, std::string data_dir, std::vector<std::string> env) :
           VmCoProcSimple("", env), bin_(bin), data_dir_(data_dir) {}
 
-    virtual void Run(void);
+    void Run(void);
     void Stop(void);
     ~VmCoProcRpmb();
 
@@ -76,7 +78,7 @@ class VmCoProcVtpm : public VmCoProcSimple {
     VmCoProcVtpm(std::string bin, std::string data_dir, std::vector<std::string> env) :
           VmCoProcSimple("", env), bin_(bin), data_dir_(data_dir) {}
 
-    virtual void Run(void);
+    void Run(void);
     void Stop(void);
     ~VmCoProcVtpm();
 

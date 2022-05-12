@@ -6,8 +6,7 @@
  *
  */
 
-#include <iostream>
-
+#if 0
 #include <grpcpp/grpcpp.h>
 
 class StartupListenerImpl final : public StartupListener::Service {
@@ -49,3 +48,4 @@ grpc::Status VmReady(grpc::ServerContext* ctx, const EmptyMessage* request, Empt
 
     return grpc::Status:OK;
 }
+#endif

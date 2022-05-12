@@ -50,9 +50,11 @@ static void StartGuest(std::string name) {
 
     Client c;
     c.PrepareStartGuestClientShm(name.c_str());
-    c.Notify(kCivMsgStartVm);
-
-    LOG(info) << "Start guest: " << name;
+    if (c.Notify(kCivMsgStartVm)) {
+        LOG(info) << "Start guest: " << name << " Done.";
+    } else {
+        LOG(error) << "Start guest: " << name << " Failed!";
+    }
     return;
 }
 
@@ -64,9 +66,11 @@ static void StopGuest(std::string name) {
 
     Client c;
     c.PrepareStopGuestClientShm(name.c_str());
-    c.Notify(kCivMsgStopVm);
-
-    LOG(info) << "Stop guest: " << name;
+    if (c.Notify(kCivMsgStopVm)) {
+        LOG(info) << "Stop guest: " << name << " Done.";
+    } else {
+        LOG(error) << "Stop guest: " << name << " Failed!";
+    }
     return;
 }
 

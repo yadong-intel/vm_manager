@@ -32,7 +32,8 @@ enum CivMsgType {
     kCivMsgStopVm,
     kCivMsgGetVmStatus,
     kCivMsgTest,
-    kCivMsgRespond = 500U,
+    kCivMsgRespondSuccess = 500U,
+    kCivMsgRespondFail,
 };
 
 struct CivMsgSync {

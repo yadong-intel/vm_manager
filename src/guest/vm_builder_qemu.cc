@@ -395,7 +395,7 @@ void VmBuilderQemu::BuildGuestPmCtrlCmd(void) {
     emul_cmd_.append(" -qmp unix:/tmp/qmp-pm-sock,server=on,wait=off -no-reboot");
 }
 
-static int get_uid(void) {
+static int GetUid(void) {
     char *suid = NULL;
     int real_uid;
     suid = getenv("SUDO_UID");
@@ -408,7 +408,7 @@ static int get_uid(void) {
 }
 
 void VmBuilderQemu::BuildAudioCmd(void) {
-    int uid = get_uid();
+    int uid = GetUid();
     emul_cmd_.append(" -device intel-hda"
                      " -device hda-duplex,audiodev=android_spk"
                      " -audiodev id=android_spk,timer-period=5000,driver=pa,"
@@ -650,6 +650,8 @@ bool VmBuilderQemu::BuildVmArgs(void) {
     if (!BuildEmulPath())
         return false;
 
+    BuildRpmbCmd();
+
     BuildFixedCmd();
 
     if (!BuildNameQmp())
@@ -659,8 +661,6 @@ bool VmBuilderQemu::BuildVmArgs(void) {
 
     if (!BuildVsockCmd())
         return false;
-
-    BuildRpmbCmd();
 
     BuildVtpmCmd();
 
@@ -694,7 +694,6 @@ bool VmBuilderQemu::BuildVmArgs(void) {
     if (aaf_cfg_)
         aaf_cfg_->Flush();
 
-    //main_proc_ = std::make_unique<VmCoProcSimple>(" qemu-system-x86_64 -device virtio-gpu", env_data_);
     main_proc_ = std::make_unique<VmCoProcSimple>(emul_cmd_, env_data_);
 
     return true;
@@ -708,17 +707,25 @@ void VmBuilderQemu::StartVm() {
             co_procs_[i]->Run();
     }
 
-    if (main_proc_)
+    if (main_proc_) {
         main_proc_->Run();
+    }
+}
+
+void VmBuilderQemu::WaitVm() {
+    if (main_proc_) {
+        main_proc_->Join();
+        StopVm();
+    }
 }
 
 void VmBuilderQemu::StopVm() {
+    if (main_proc_)
+        main_proc_->Stop();
+
     for (size_t i = 0; i < co_procs_.size(); ++i) {
         co_procs_[i]->Stop();
     }
-
-    if (main_proc_)
-        main_proc_->Stop();
 
     while (!end_call_.empty()) {
         end_call_.front()();
