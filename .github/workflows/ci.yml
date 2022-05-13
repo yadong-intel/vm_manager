@@ -18,12 +18,12 @@ jobs:
         with:
           path: vm-manager
 
-      - uses: actions/checkout@v2
-        with:
-          repository: grpc/grpc
-          path: grpc
-          ref: v1.43.0
-          submodules: recursive
+      #- uses: actions/checkout@v2
+      #  with:
+      #    repository: grpc/grpc
+      #    path: grpc
+      #    ref: v1.43.0
+      #    submodules: recursive
 
       - name: setup
         run: |
@@ -39,23 +39,23 @@ jobs:
           which gcc
           ls /usr/bin/gcc*
 
-      - name: install_grpc
-        run: |
-          mkdir ${{ env.LOCAL_INSTALL_DIR }}
-          export PATH="${{ env.LOCAL_INSTALL_DIR }}/bin:$PATH"
+      #- name: install_grpc
+      #  run: |
+      #    mkdir ${{ env.LOCAL_INSTALL_DIR }}
+      #    export PATH="${{ env.LOCAL_INSTALL_DIR }}/bin:$PATH"
 
           #Patching
-          cd grpc/
-          git am -3 ${{ github.workspace }}/vm-manager/external/patches/grpc/*.patch
-          cd -
+      #    cd grpc/
+      #    git am -3 ${{ github.workspace }}/vm-manager/external/patches/grpc/*.patch
+      #    cd -
 
           #Build and install gRPC
-          mkdir -p grpc/cmake/build
-          pushd grpc/cmake/build
+      #    mkdir -p grpc/cmake/build
+      #    pushd grpc/cmake/build
           #cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TEST=OFF -DCMAKE_INSTALL_PREFIX=${{ env.LOCAL_INSTALL_DIR }} ../..
           #make -j4
           #make install
-          popd
+      #    popd
 
           #Build and install abseil-cpp
           #mkdir -p grpc/third_party/abseil-cpp/cmake/build
@@ -65,9 +65,9 @@ jobs:
           #make install
           #popd
 
-      - name: build_grpc_example
-        run: |
-          export PATH="${{ env.LOCAL_INSTALL_DIR }}/bin:$PATH"
+      #- name: build_grpc_example
+      #  run: |
+      #    export PATH="${{ env.LOCAL_INSTALL_DIR }}/bin:$PATH"
           #mkdir -p grpc/examples/cpp/helloworld/cmake/build
           #pushd grpc/examples/cpp/helloworld/cmake/build
           #cmake -DCMAKE_PREFIX_PATH=${{ env.LOCAL_INSTALL_DIR }} ../..
@@ -87,11 +87,11 @@ jobs:
         with:
           name: vm-manager.${{ matrix.os }}.${{ github.run_id }}.${{ github.sha }}
           path: |
-            ${{ github.workspace }}/grpc/examples/cpp/helloworld/cmake/build/
-            ${{ github.workspace }}/grpc/examples/cpp/helloworld/cmake/build/
             ${{ github.workspace }}/vm-manager/debian/
             *.deb
             *.ddeb
             *.build
             *.buildinfo
             *.changes
+            ${{ github.workspace }}/grpc/examples/cpp/helloworld/cmake/build/
+            ${{ github.workspace }}/grpc/examples/cpp/helloworld/cmake/build/

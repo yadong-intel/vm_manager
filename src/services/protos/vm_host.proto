@@ -6,11 +6,13 @@
 
 syntax = "proto3";
 
-package StartupListener;
+package vm_manager;
 
 message EmptyMessage {}
 
 // The Startup Listener service definition.
 service StartupListener {
-  rpc VmReady (EmptyMessage) returns (EmptyMessage) {}
+  // Called by each VM when it starts up to indicate that it is ready to handle
+  // incoming requests.
+  rpc VmReady (EmptyMessage) returns (EmptyMessage);
 }
