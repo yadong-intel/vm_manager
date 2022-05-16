@@ -20,6 +20,7 @@ set(vm_host_grpc_hdrs "${PROTOS_GEN_DIR}/vm_host.grpc.pb.h")
 
 add_custom_command(
       OUTPUT "${vm_host_proto_srcs}" "${vm_host_proto_hdrs}" "${vm_host_grpc_srcs}" "${vm_host_grpc_hdrs}"
+      COMMAND ${CMAKE_COMMAND} -E remove_directory ${PROTOS_GEN_DIR}
       COMMAND ${CMAKE_COMMAND} -E make_directory ${PROTOS_GEN_DIR}
       COMMAND ${_PROTOBUF_PROTOC}
       ARGS --grpc_out "${PROTOS_GEN_DIR}"

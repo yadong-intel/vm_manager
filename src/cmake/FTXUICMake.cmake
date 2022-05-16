@@ -14,6 +14,7 @@ FetchContent_Declare(ftxui
   GIT_TAG 548fa51b7115551b42c0f12235de9eb79e7e33e3
   #GIT_SHALLOW 1
 )
+set(FETCHCONTENT_QUIET OFF)
 
 FetchContent_GetProperties(ftxui)
 if(NOT ftxui_POPULATED)

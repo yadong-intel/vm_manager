@@ -6,6 +6,7 @@
  *
  */
 
+#include <map>
 
 #include <grpcpp/grpcpp.h>
 
