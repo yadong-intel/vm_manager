@@ -16,7 +16,7 @@ macro(apply_git_patch REPO_PATH PATCH_PATH)
 
   if(${SUCCESS} EQUAL 0)
     message("Applying git patch ${PATCH_PATH} in ${REPO_PATH} repository")
-    execute_process(COMMAND git apply ${PATCH_PATH}
+    execute_process(COMMAND git am -3 ${PATCH_PATH}
       WORKING_DIRECTORY ${REPO_PATH}
       RESULT_VARIABLE SUCCESS)
 
@@ -37,13 +37,18 @@ FetchContent_Declare(
 )
 set(FETCHCONTENT_QUIET OFF)
 
-FetchContent_MakeAvailable(grpc)
+FetchContent_GetProperties(grpc)
+if (NOT grpc_POPULATED)
+  FetchContent_Populate(grpc)
 
-#Apply VSOCK patches
-file(GLOB patches_files "${CMAKE_SOURCE_DIR}/src/external/patches/grpc/*.patch")
-foreach(file ${patches_files})
-  apply_git_patch(${grpc_SOURCE_DIR} ${file})
-endforeach()
+  #Apply VSOCK patches
+  file(GLOB patches_files "${CMAKE_SOURCE_DIR}/src/external/patches/grpc/*.patch")
+  foreach(file ${patches_files})
+    apply_git_patch(${grpc_SOURCE_DIR} ${file})
+  endforeach()
+
+  add_subdirectory(${grpc_SOURCE_DIR} ${grpc_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 set(_PROTOBUF_LIBPROTOBUF libprotobuf)
 set(_REFLECTION grpc++_reflection)

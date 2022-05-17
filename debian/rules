@@ -4,23 +4,23 @@ export DH_VERBOSE = 1
 #export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
-export DEB_CFLAGS_SET = -g -O2 -fstack-protector-strong
-export DEB_CXXFLAGS_SET = -g -O2 -fstack-protector-strong
+export DEB_BUILD_MAINT_OPTIONS = hardening=-all
+export DEB_CFLAGS_SET = -g -O2 #-fstack-protector-strong
+export DEB_CPPFLAGS_SET =
+export DEB_CXXFLAGS_SET = -g -O2 #-fstack-protector-strong
 export DEB_LDFLAGS_SET =
 
-export BUILD_DIR=$(CURDIR)/debian/build
+#export BUILD_DIR=$(CURDIR)/debian/build
 
 %:
 	dh $@ --parallel
 
 override_dh_auto_configure:
-	mkdir -p $(BUILD_DIR)
-	cd $(BUILD_DIR)
-	cmake -S $(CURDIR) -B $(BUILD_DIR)
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release
 
-override_dh_auto_build:
-	cd $(BUILD_DIR)
-	cmake --build $(BUILD_DIR)
+#override_dh_auto_build:
+#	cd $(BUILD_DIR)
+#	cmake --build $(BUILD_DIR)
 
 override_dh_auto_install:
 	dh_auto_install -- prefix=/usr

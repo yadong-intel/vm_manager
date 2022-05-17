@@ -44,9 +44,9 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE ep_boost::chrono
   #PRIVATE grpc++
   vm_host_grpc_proto
-  PRIVATE ${_REFLECTION}
+  #PRIVATE ${_REFLECTION}
   PRIVATE ${_GRPC_GRPCPP}
-  PRIVATE ${_PROTOBUF_LIBPROTOBUF}
+  #PRIVATE ${_PROTOBUF_LIBPROTOBUF}
   -lrt
 )
 
