@@ -6,6 +6,8 @@
  *
  */
 #include <signal.h>
+#include <sys/socket.h>
+#include <linux/vm_sockets.h>
 
 #include <iostream>
 #include <exception>
@@ -20,18 +22,19 @@
 #include <boost/process/environment.hpp>
 #include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/containers/string.hpp>
+#include <boost/thread/mutex.hpp>
+
+#include <grpcpp/grpcpp.h>
 
 #include "services/server.h"
 #include "services/message.h"
 #include "guest/vm_builder_qemu.h"
 #include "utils/log.h"
 #include "utils/utils.h"
+#include "include/constants/vm_manager.h"
 
 namespace vm_manager {
 
-const char *kCivServerMemName = "CivServerShm";
-const char *kCivServerObjSync = "Civ Message Sync";
-const char *kCivServerObjData = "Civ Message Data";
 const int kCivSharedMemSize = 20480U;
 
 size_t Server::FindVmInstance(std::string name) {
@@ -65,12 +68,47 @@ int Server::StopVm(const char payload[]) {
     return 0;
 }
 
+void RunListenerService(grpc::Service* listener,
+                        const std::string& listener_address,
+                        boost::condition_variable_any *listener_started,
+                        std::shared_ptr<grpc::Server>* server_copy) {
+    grpc::ServerBuilder builder;
+    LOG(info) << "Startup Listener listen@" << listener_address;
+    builder.AddListeningPort(listener_address, grpc::InsecureServerCredentials());
+    builder.RegisterService(listener);
+
+    std::shared_ptr<grpc::Server> server(builder.BuildAndStart().release());
+
+    *server_copy = server;
+    listener_started->notify_one();
+
+    if (server) {
+        server->Wait();
+    }
+}
+
+bool Server::SetupListenerService(void) {
+    boost::mutex listener_mutex;
+    boost::unique_lock<boost::mutex> listener_lock(listener_mutex);
+    boost::condition_variable_any listener_started;
+    char listener_address[50] = { 0 };
+    snprintf(listener_address, sizeof(listener_address) - 1, "vsock:%u:%u", VMADDR_CID_ANY, kCiVStartupListenerPort);
+
+    listener_thread_ =
+        std::make_unique<boost::thread>(RunListenerService,
+                                        &startup_listener_,
+                                        boost::ref(listener_address),
+                                        &listener_started,
+                                        &listener_server_);
+    listener_started.wait(listener_lock);
+    return true;
+}
+
 void Server::VmThread(VmBuilder *vb) {
     if (!vb)
         return;
 
-    /* Build VM releated Arguments */
-    if (!vb->BuildVmArgs())
+    if (vb->GetState() != VmBuilder::VmState::kVmCreated)
         return;
 
     LOG(info) << "Starting VM:  " << vb->GetName();
@@ -120,10 +158,28 @@ int Server::StartVm(const char payload[]) {
     }
 
     VmBuilder *vb = vmi->get();
+    /* Build VM releated Arguments */
+    if (!vb->BuildVmArgs())
+        return -1;
+
+    boost::mutex pending_vm_mutex;
+    boost::unique_lock<boost::mutex> pending_vm_lock(pending_vm_mutex);
+    boost::condition_variable_any pending_vm_cond;
+    startup_listener_.AddPendingVM(vb->GetCid(), [&pending_vm_cond](){
+        pending_vm_cond.notify_one();
+    });
+
     boost::thread t([this, vb]() {
         VmThread(vb);
     });
 
+    if (pending_vm_cond.wait_for(pending_vm_lock, boost::chrono::seconds(200)) == boost::cv_status::timeout) {
+        LOG(error) << "CiV[" << vb->GetName() << "]" << " Failed to bootup!";
+        startup_listener_.RemovePendingVM(vb->GetCid());
+        vb->StopVm();
+        return -1;
+    }
+    LOG(info) << "CiV[" << vb->GetName() << "]" << "is ready!";
     t.detach();
 
     return 0;
@@ -138,6 +194,8 @@ void Server::Start(void) {
     try {
         signal(SIGINT, HandleSIG);
         signal(SIGTERM, HandleSIG);
+
+        SetupListenerService();
 
         struct shm_remove {
             shm_remove() { boost::interprocess::shared_memory_object::remove(kCivServerMemName); }
@@ -186,6 +244,9 @@ void Server::Start(void) {
                         data.first->type = kCivMsgRespondFail;
                     }
                     break;
+                case kCivMsgGetVmState:
+                    //GetVmState(data.first->payload);
+                    break;
                 case kCivMsgTest:
                     break;
                 default:
@@ -207,6 +268,8 @@ void Server::Stop(void) {
     LOG(info) << "Stop CiV Server!";
     stop_server_ = true;
     sync_->cond_s.notify_one();
+    if (listener_server_)
+        listener_server_->Shutdown();
 }
 
 Server &Server::Get(void) {

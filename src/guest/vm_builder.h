@@ -25,15 +25,30 @@ namespace vm_manager {
 
 class VmBuilder {
  public:
-    VmBuilder(std::string name) : name_(name) {}
+    enum class VmState {
+       kVmEmpty = 0,
+       kVmCreated,
+       kVmBooting,
+       kVmRunning,
+       kVmPaused,
+    };
+
+ public:
+    explicit VmBuilder(std::string name) : name_(name) {}
     virtual ~VmBuilder() = default;
     virtual bool BuildVmArgs(void) = 0;
     virtual void StartVm(void) = 0;
     virtual void WaitVm(void) = 0;
     virtual void StopVm(void) = 0;
+    virtual void PauseVm(void) = 0;
     std::string GetName(void);
+    uint32_t GetCid(void);
+    VmState GetState(void);
+
  protected:
     std::string name_;
+    uint32_t vsock_cid_;
+    VmState state_ = VmBuilder::VmState::kVmEmpty;
 };
 
 }  // namespace vm_manager

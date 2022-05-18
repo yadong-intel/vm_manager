@@ -20,9 +20,9 @@
 
 namespace vm_manager {
 
-extern const char *kRpmbData;
-extern const char *kRpmbSock;
-extern const char *kVtpmSock;
+inline constexpr const char *kRpmbData = "RPMB_DATA";
+inline constexpr const char *kRpmbSock = "rpmb_sock";
+inline constexpr const char *kVtpmSock = "swtpm-sock";
 
 class VmProcess {
  public:

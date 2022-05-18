@@ -93,8 +93,6 @@ VmCoProcSimple::~VmCoProcSimple() {
     Stop();
 }
 
-const char *kRpmbData = "RPMB_DATA";
-const char *kRpmbSock = "rpmb_sock";
 
 void VmCoProcRpmb::Run(void) {
     LOG(info) << bin_ << " " << data_dir_;
@@ -122,8 +120,6 @@ void VmCoProcRpmb::Stop(void) {
     }
 }
 
-
-const char *kVtpmSock = "swtpm-sock";
 
 VmCoProcRpmb::~VmCoProcRpmb() {
     Stop();

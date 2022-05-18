@@ -21,16 +21,16 @@ namespace vm_manager {
 typedef boost::interprocess::allocator<char, boost::interprocess::managed_shared_memory::segment_manager> CharAllocator;
 typedef boost::interprocess::basic_string<char, std::char_traits<char>, CharAllocator> bstring;
 
-extern const char *kCivServerMemName;
-extern const char *kCivServerObjSync;
-extern const char *kCivServerObjData;
+inline constexpr const char *kCivServerMemName = "CivServerShm";
+inline constexpr const char *kCivServerObjSync = "Civ Message Sync";
+inline constexpr const char *kCivServerObjData = "Civ Message Data";
 
 
 enum CivMsgType {
     kCiVMsgStopServer = 100U,
     kCivMsgStartVm,
     kCivMsgStopVm,
-    kCivMsgGetVmStatus,
+    kCivMsgGetVmState,
     kCivMsgTest,
     kCivMsgRespondSuccess = 500U,
     kCivMsgRespondFail,

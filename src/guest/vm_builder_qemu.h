@@ -34,6 +34,7 @@ class VmBuilderQemu : public VmBuilder {
     void StartVm(void);
     void StopVm(void);
     void WaitVm(void);
+    void PauseVm(void);
 
  private:
     bool BuildEmulPath(void);
@@ -65,7 +66,7 @@ class VmBuilderQemu : public VmBuilder {
 
     CivConfig cfg_;
     std::unique_ptr<Aaf> aaf_cfg_;
-    uint32_t vsock_cid_;
+
     bool vm_ready = false;
     std::unique_ptr<VmProcess> main_proc_;
     std::vector<std::unique_ptr<VmProcess>> co_procs_;

@@ -492,8 +492,8 @@ void VmBuilderQemu::BuildNetCmd(void) {
     std::string fb_port = cfg_.GetValue(kGroupGlob, kGlobFastbootPort);
     if (!fb_port.empty())
         net_arg.append(",hostfwd=tcp::" + fb_port + "-:5554");
-    emul_cmd_.append(net_arg);
 
+    emul_cmd_.append(net_arg);
     emul_cmd_.append(" -device e1000,netdev=net0,bus=pcie.0,addr=0xA");
 }
 
@@ -696,6 +696,8 @@ bool VmBuilderQemu::BuildVmArgs(void) {
 
     main_proc_ = std::make_unique<VmCoProcSimple>(emul_cmd_, env_data_);
 
+    state_ = VmBuilder::VmState::kVmCreated;
+
     return true;
 }
 
@@ -709,7 +711,12 @@ void VmBuilderQemu::StartVm() {
 
     if (main_proc_) {
         main_proc_->Run();
+        state_ = VmBuilder::VmState::kVmBooting;
     }
+}
+
+void VmBuilderQemu::PauseVm(void) {
+
 }
 
 void VmBuilderQemu::WaitVm() {
