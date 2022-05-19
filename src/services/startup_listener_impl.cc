@@ -32,7 +32,6 @@ grpc::Status StartupListenerImpl::VmReady(grpc::ServerContext* ctx,
         return grpc::Status(grpc::FAILED_PRECONDITION, "VM is unknown");
     }
 
-    //iter->second->Signal();
     if (iter->second != nullptr)
         iter->second();
 

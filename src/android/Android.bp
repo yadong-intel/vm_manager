@@ -16,7 +16,7 @@ INCLUDE_DIR = [
     "external/protobuf/src",
     "external/protobuf/config",
     "external/protobuf/android",
-    "device/intel/civ/host/vm-manager/src/include"
+    "device/intel/civ/host/vm-manager/src/include/constants"
 ]
 
 CFLAGS = [

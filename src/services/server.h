@@ -19,6 +19,12 @@
 
 namespace vm_manager {
 
+struct StartupListenerInst {
+    StartupListenerImpl listener;
+    std::unique_ptr<boost::thread> thread;
+    std::shared_ptr<grpc::Server> server;
+};
+
 class Server final {
  public:
     static Server &Get(void);
@@ -44,7 +50,7 @@ class Server final {
 
     void AsyncWaitSignal(void);
 
-    bool SetupListenerService();
+    bool SetupStartupListenerService();
 
     bool stop_server_ = false;
 
@@ -54,9 +60,7 @@ class Server final {
 
     std::mutex vmis_mutex_;
 
-    StartupListenerImpl startup_listener_;
-    std::unique_ptr<boost::thread> listener_thread_;
-    std::shared_ptr<grpc::Server> listener_server_;
+    StartupListenerInst startup_listener_;
 };
 
 }  // namespace vm_manager

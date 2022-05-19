@@ -1,7 +1,7 @@
-From 14ff3c7a84d00a775180ecc866b7ae71741da262 Mon Sep 17 00:00:00 2001
+From d23ab41e36953946c9ba6add3a5f5daf67b520bc Mon Sep 17 00:00:00 2001
 From: "Qi, Yadong" <yadong.qi@intel.com>
 Date: Mon, 19 Jul 2021 08:01:08 +0000
-Subject: [PATCH] example: helloworld: allow input arg for greet_server
+Subject: [PATCH 2/2] example: helloworld: allow input arg for greet_server
 
 allow input args for greet_server.
 

@@ -6,6 +6,7 @@
  *
  */
 
+#include <sys/socket.h>
 #include <linux/vm_sockets.h>
 
 #include <string>

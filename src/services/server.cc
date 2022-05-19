@@ -69,7 +69,7 @@ int Server::StopVm(const char payload[]) {
 }
 
 void RunListenerService(grpc::Service* listener,
-                        const std::string& listener_address,
+                        const char *listener_address,
                         boost::condition_variable_any *listener_started,
                         std::shared_ptr<grpc::Server>* server_copy) {
     grpc::ServerBuilder builder;
@@ -87,19 +87,19 @@ void RunListenerService(grpc::Service* listener,
     }
 }
 
-bool Server::SetupListenerService(void) {
+bool Server::SetupStartupListenerService(void) {
     boost::mutex listener_mutex;
     boost::unique_lock<boost::mutex> listener_lock(listener_mutex);
     boost::condition_variable_any listener_started;
     char listener_address[50] = { 0 };
     snprintf(listener_address, sizeof(listener_address) - 1, "vsock:%u:%u", VMADDR_CID_ANY, kCiVStartupListenerPort);
 
-    listener_thread_ =
+    startup_listener_.thread =
         std::make_unique<boost::thread>(RunListenerService,
-                                        &startup_listener_,
-                                        boost::ref(listener_address),
+                                        &startup_listener_.listener,
+                                        listener_address,
                                         &listener_started,
-                                        &listener_server_);
+                                        &startup_listener_.server);
     listener_started.wait(listener_lock);
     return true;
 }
@@ -165,7 +165,7 @@ int Server::StartVm(const char payload[]) {
     boost::mutex pending_vm_mutex;
     boost::unique_lock<boost::mutex> pending_vm_lock(pending_vm_mutex);
     boost::condition_variable_any pending_vm_cond;
-    startup_listener_.AddPendingVM(vb->GetCid(), [&pending_vm_cond](){
+    startup_listener_.listener.AddPendingVM(vb->GetCid(), [&pending_vm_cond](){
         pending_vm_cond.notify_one();
     });
 
@@ -175,11 +175,11 @@ int Server::StartVm(const char payload[]) {
 
     if (pending_vm_cond.wait_for(pending_vm_lock, boost::chrono::seconds(200)) == boost::cv_status::timeout) {
         LOG(error) << "CiV[" << vb->GetName() << "]" << " Failed to bootup!";
-        startup_listener_.RemovePendingVM(vb->GetCid());
+        startup_listener_.listener.RemovePendingVM(vb->GetCid());
         vb->StopVm();
         return -1;
     }
-    LOG(info) << "CiV[" << vb->GetName() << "]" << "is ready!";
+    LOG(info) << "CiV[" << vb->GetName() << "]" << " is ready!";
     t.detach();
 
     return 0;
@@ -195,7 +195,7 @@ void Server::Start(void) {
         signal(SIGINT, HandleSIG);
         signal(SIGTERM, HandleSIG);
 
-        SetupListenerService();
+        SetupStartupListenerService();
 
         struct shm_remove {
             shm_remove() { boost::interprocess::shared_memory_object::remove(kCivServerMemName); }
@@ -268,8 +268,8 @@ void Server::Stop(void) {
     LOG(info) << "Stop CiV Server!";
     stop_server_ = true;
     sync_->cond_s.notify_one();
-    if (listener_server_)
-        listener_server_->Shutdown();
+    if (startup_listener_.server)
+        startup_listener_.server->Shutdown();
 }
 
 Server &Server::Get(void) {
