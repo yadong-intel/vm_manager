@@ -15,6 +15,7 @@
 
 #include <boost/thread.hpp>
 #include <boost/asio.hpp>
+#include <boost/thread/latch.hpp>
 
 #include "utils/log.h"
 
@@ -36,7 +37,7 @@ class VmProcess {
 class VmCoProcSimple : public VmProcess {
  public:
     VmCoProcSimple(std::string cmd, std::vector<std::string> env) :
-                    cmd_(cmd), env_data_(env) {}
+                    cmd_(cmd), env_data_(env), child_latch_(1) {}
     void Run(void);
     void Stop(void);
     bool Running(void);
@@ -48,10 +49,12 @@ class VmCoProcSimple : public VmProcess {
 
     void ThreadMon(void);
 
+
     std::string cmd_;
     std::vector<std::string> env_data_;
 
     std::unique_ptr<boost::process::child> c_;
+    boost::latch child_latch_;
  private:
     std::unique_ptr<boost::thread> mon_;
 };

@@ -54,9 +54,10 @@ void Aaf::Flush(void) {
         LOG(info) << target_file;
         while (!in.eof()) {
             getline(in, tmp);
+            if (tmp.empty())
+                continue;
             std::string key = tmp.substr(0, tmp.find(":"));
 
-            LOG(info) << key;
             auto find = data_.find(key);
             if ((find != data_.end()) && !find->second.empty()) {
                 out << key << ":" << find->second << "\n";

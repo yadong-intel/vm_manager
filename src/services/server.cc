@@ -70,7 +70,7 @@ int Server::StopVm(const char payload[]) {
 
 void RunListenerService(grpc::Service* listener,
                         const char *listener_address,
-                        boost::condition_variable_any *listener_started,
+                        boost::latch *listener_ready,
                         std::shared_ptr<grpc::Server>* server_copy) {
     grpc::ServerBuilder builder;
     LOG(info) << "Startup Listener listen@" << listener_address;
@@ -80,7 +80,7 @@ void RunListenerService(grpc::Service* listener,
     std::shared_ptr<grpc::Server> server(builder.BuildAndStart().release());
 
     *server_copy = server;
-    listener_started->notify_one();
+    listener_ready->try_count_down();
 
     if (server) {
         server->Wait();
@@ -88,9 +88,7 @@ void RunListenerService(grpc::Service* listener,
 }
 
 bool Server::SetupStartupListenerService(void) {
-    boost::mutex listener_mutex;
-    boost::unique_lock<boost::mutex> listener_lock(listener_mutex);
-    boost::condition_variable_any listener_started;
+    boost::latch listener_ready(1);
     char listener_address[50] = { 0 };
     snprintf(listener_address, sizeof(listener_address) - 1, "vsock:%u:%u", VMADDR_CID_ANY, kCiVStartupListenerPort);
 
@@ -98,27 +96,30 @@ bool Server::SetupStartupListenerService(void) {
         std::make_unique<boost::thread>(RunListenerService,
                                         &startup_listener_.listener,
                                         listener_address,
-                                        &listener_started,
+                                        &listener_ready,
                                         &startup_listener_.server);
-    listener_started.wait(listener_lock);
+    listener_ready.wait();
     return true;
 }
 
-void Server::VmThread(VmBuilder *vb) {
-    if (!vb)
-        return;
-
-    if (vb->GetState() != VmBuilder::VmState::kVmCreated)
-        return;
+void Server::VmThread(VmBuilder *vb, boost::latch *wait_continue, bool *vm_ready) {
+    startup_listener_.listener.AddPendingVM(vb->GetCid(), [vb](){
+        vb->SetVmReady();
+    });
 
     LOG(info) << "Starting VM:  " << vb->GetName();
     /* Start VM */
     vb->StartVm();
 
-    /* Wait VM to exit */
-    vb->WaitVm();
-
-    DeleteVmInstance(vb->GetName());
+    if (vb->WaitVmReady()) {
+        *vm_ready = true;
+        wait_continue->try_count_down();
+        vb->WaitVmExit();
+        DeleteVmInstance(vb->GetName());
+    } else {
+        DeleteVmInstance(vb->GetName());
+        wait_continue->try_count_down();
+    }
 }
 
 int Server::StartVm(const char payload[]) {
@@ -162,27 +163,31 @@ int Server::StartVm(const char payload[]) {
     if (!vb->BuildVmArgs())
         return -1;
 
-    boost::mutex pending_vm_mutex;
-    boost::unique_lock<boost::mutex> pending_vm_lock(pending_vm_mutex);
-    boost::condition_variable_any pending_vm_cond;
-    startup_listener_.listener.AddPendingVM(vb->GetCid(), [&pending_vm_cond](){
-        pending_vm_cond.notify_one();
-    });
+    boost::latch wait_continue = 1;
+    bool vm_ready = false;
 
-    boost::thread t([this, vb]() {
-        VmThread(vb);
+    boost::thread t([this, vb, &wait_continue, &vm_ready]() {
+        VmThread(vb, &wait_continue, &vm_ready);
     });
+    t.detach();
 
-    if (pending_vm_cond.wait_for(pending_vm_lock, boost::chrono::seconds(200)) == boost::cv_status::timeout) {
+    wait_continue.wait();
+
+    if (vm_ready) {
+        return 0;
+    }
+    return -1;
+#if 0
+    if (wait_continue.wait_for(boost::chrono::seconds(200)) == boost::cv_status::timeout) {
         LOG(error) << "CiV[" << vb->GetName() << "]" << " Failed to bootup!";
         startup_listener_.listener.RemovePendingVM(vb->GetCid());
-        vb->StopVm();
         return -1;
     }
     LOG(info) << "CiV[" << vb->GetName() << "]" << " is ready!";
     t.detach();
 
     return 0;
+#endif
 }
 
 static void HandleSIG(int num) {

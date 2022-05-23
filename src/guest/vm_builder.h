@@ -38,9 +38,11 @@ class VmBuilder {
     virtual ~VmBuilder() = default;
     virtual bool BuildVmArgs(void) = 0;
     virtual void StartVm(void) = 0;
-    virtual void WaitVm(void) = 0;
+    virtual void WaitVmExit(void) = 0;
     virtual void StopVm(void) = 0;
     virtual void PauseVm(void) = 0;
+    virtual bool WaitVmReady(void) = 0;
+    virtual void SetVmReady(void) = 0;
     std::string GetName(void);
     uint32_t GetCid(void);
     VmState GetState(void);
@@ -49,6 +51,7 @@ class VmBuilder {
     std::string name_;
     uint32_t vsock_cid_;
     VmState state_ = VmBuilder::VmState::kVmEmpty;
+    std::mutex state_lock_;
 };
 
 }  // namespace vm_manager

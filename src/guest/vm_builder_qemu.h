@@ -18,6 +18,7 @@
 #include <queue>
 
 #include <boost/ptr_container/ptr_vector.hpp>
+#include <boost/thread/latch.hpp>
 
 #include "guest/config_parser.h"
 #include "guest/vm_builder.h"
@@ -28,13 +29,15 @@ namespace vm_manager {
 class VmBuilderQemu : public VmBuilder {
  public:
     explicit VmBuilderQemu(std::string name, CivConfig cfg, std::vector<std::string> env) :
-                       VmBuilder(name), cfg_(cfg), env_data_(env) {}
+                       VmBuilder(name), cfg_(cfg), env_data_(env), vm_ready_latch_(1) {}
     ~VmBuilderQemu();
     bool BuildVmArgs(void);
     void StartVm(void);
     void StopVm(void);
-    void WaitVm(void);
+    void WaitVmExit(void);
     void PauseVm(void);
+    bool WaitVmReady(void);
+    void SetVmReady(void);
 
  private:
     bool BuildEmulPath(void);
@@ -67,12 +70,12 @@ class VmBuilderQemu : public VmBuilder {
     CivConfig cfg_;
     std::unique_ptr<Aaf> aaf_cfg_;
 
-    bool vm_ready = false;
     std::unique_ptr<VmProcess> main_proc_;
     std::vector<std::unique_ptr<VmProcess>> co_procs_;
     std::string emul_cmd_;
     std::vector<std::string> env_data_;
     std::set<std::string> pci_pt_dev_set_;
+    boost::latch vm_ready_latch_;
     std::queue<std::function<void(void)>> end_call_;
 };
 

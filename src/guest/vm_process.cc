@@ -7,11 +7,13 @@
  */
 
 #include <filesystem>
+#include <fstream>
 #include <ctime>
 
 #include <boost/process.hpp>
 #include <boost/process/environment.hpp>
 #include <boost/thread.hpp>
+#include <boost/process/extend.hpp>
 
 #include "utils/log.h"
 #include "guest/vm_process.h"
@@ -43,11 +45,22 @@ void VmCoProcSimple::ThreadMon(void) {
     std::string f_out = "/tmp/" + std::string(basename(exe.c_str())) + "_" + t_buf + "_" + tid + "_out.log";
 
     c_ = std::make_unique<boost::process::child>(
-                            cmd_,
-                            boost::process::env = env,
-                            (boost::process::std_out & boost::process::std_err) > f_out, ec);
+        cmd_,
+        boost::process::env = env,
+        (boost::process::std_out & boost::process::std_err) > f_out,
+        ec,
+        boost::process::extend::on_success = [this](auto & exec) {
+            child_latch_.count_down();
+        },
+        boost::process::extend::on_error = [this](auto & exec, const std::error_code& ec) {
+            child_latch_.count_down();
+        });
+
 
     c_->wait(ec);
+
+    std::ofstream out(f_out, std::fstream::app);
+    out << "\n\nCMD: " << cmd_;
 
     int result = c_->exit_code();
 
@@ -58,6 +71,7 @@ void VmCoProcSimple::ThreadMon(void) {
 
 void VmCoProcSimple::Run(void) {
     mon_ = std::make_unique<boost::thread>([this] { ThreadMon(); });
+    child_latch_.wait();
 }
 
 void VmCoProcSimple::Join(void) {
@@ -98,7 +112,7 @@ void VmCoProcRpmb::Run(void) {
     LOG(info) << bin_ << " " << data_dir_;
     if (!boost::filesystem::exists(data_dir_ + "/" + kRpmbData)) {
         std::error_code ec;
-        boost::process::child init_data(bin_, "--dev " + data_dir_ + "/" + kRpmbData + " --init --size 2048");
+        boost::process::child init_data(bin_ + " --dev " + data_dir_ + "/" + kRpmbData + " --init --size 2048");
         init_data.wait(ec);
         int ret = init_data.exit_code();
     }

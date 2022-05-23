@@ -12,6 +12,8 @@
 #include <vector>
 #include <memory>
 
+#include <boost/thread/latch.hpp>
+
 #include "utils/log.h"
 #include "guest/vm_builder.h"
 #include "services/message.h"
@@ -44,7 +46,7 @@ class Server final {
     int StartVm(const char payload[]);
     int StopVm(const char payload[]);
 
-    void VmThread(VmBuilder *vb);
+    void VmThread(VmBuilder *vb, boost::latch *wait_continue, bool *vm_ready);
 
     void Accept();
 

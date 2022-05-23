@@ -550,7 +550,7 @@ void VmBuilderQemu::BuildVtpmCmd(void) {
 void VmBuilderQemu::BuildAafCfg(void) {
     std::string aaf_path = cfg_.GetValue(kGroupAaf, kAafPath);
     if (!aaf_path.empty()) {
-        emul_cmd_.append(" -virtfs local,mount_tag=Download9p,security_model=none,addr=3,path=" + aaf_path);
+        emul_cmd_.append(" -virtfs local,mount_tag=Download9p,security_model=none,path=" + aaf_path); //,addr=3
         aaf_cfg_ = std::make_unique<Aaf>(aaf_path.c_str());
 
         std::string aaf_suspend = cfg_.GetValue(kGroupAaf, kAafSuspend);
@@ -654,6 +654,8 @@ bool VmBuilderQemu::BuildVmArgs(void) {
 
     BuildFixedCmd();
 
+    BuildAafCfg();
+
     if (!BuildNameQmp())
         return false;
 
@@ -711,18 +713,39 @@ void VmBuilderQemu::StartVm() {
 
     if (main_proc_) {
         main_proc_->Run();
+        LOG(info) << "Main Proc is started";
         state_ = VmBuilder::VmState::kVmBooting;
     }
+}
+
+bool VmBuilderQemu::WaitVmReady(void) {
+    int wait_cnt = 0;
+    while (wait_cnt++ < 200) {
+        if (!main_proc_->Running())
+            return false;
+        vm_ready_latch_.wait_for(boost::chrono::seconds(1));
+
+        if (state_ == VmBuilder::VmState::kVmRunning)
+            return true;
+    }
+
+    return false;
+}
+
+void VmBuilderQemu::SetVmReady(void) {
+    vm_ready_latch_.try_count_down();
+
+    state_ = VmBuilder::VmState::kVmRunning;
 }
 
 void VmBuilderQemu::PauseVm(void) {
 
 }
 
-void VmBuilderQemu::WaitVm() {
+void VmBuilderQemu::WaitVmExit() {
     if (main_proc_) {
         main_proc_->Join();
-        StopVm();
+        //StopVm();
     }
 }
 
@@ -733,6 +756,8 @@ void VmBuilderQemu::StopVm() {
     for (size_t i = 0; i < co_procs_.size(); ++i) {
         co_procs_[i]->Stop();
     }
+
+    VsockCidPool::Pool().ReleaseCid(vsock_cid_);
 
     while (!end_call_.empty()) {
         end_call_.front()();
