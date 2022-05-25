@@ -17,17 +17,19 @@
 namespace vm_manager {
 class Client {
  public:
-  Client();
-  ~Client();
+    Client();
+    ~Client();
 
-  void PrepareStartGuestClientShm(const char *vm_name);
-  void PrepareStopGuestClientShm(const char *vm_name);
-  bool Notify(CivMsgType t);
+    void PrepareImportGuestClientShm(const char *cfg_path);
+    std::vector<std::string> GetGuestLists(void);
+    void PrepareStartGuestClientShm(const char *vm_name);
+    void PrepareStopGuestClientShm(const char *vm_name);
+    bool Notify(CivMsgType t);
 
  private:
-  boost::interprocess::managed_shared_memory server_shm_;
-  boost::interprocess::managed_shared_memory client_shm_;
-  std::string client_shm_name_;
+    boost::interprocess::managed_shared_memory server_shm_;
+    boost::interprocess::managed_shared_memory client_shm_;
+    std::string client_shm_name_;
 };
 
 }  // namespace vm_manager

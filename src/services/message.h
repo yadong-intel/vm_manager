@@ -28,6 +28,8 @@ inline constexpr const char *kCivServerObjData = "Civ Message Data";
 
 enum CivMsgType {
     kCiVMsgStopServer = 100U,
+    kCivMsgListVm,
+    kCivMsgImportVm,
     kCivMsgStartVm,
     kCivMsgStopVm,
     kCivMsgGetVmState,

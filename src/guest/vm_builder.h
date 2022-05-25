@@ -43,6 +43,7 @@ class VmBuilder {
     virtual void PauseVm(void) = 0;
     virtual bool WaitVmReady(void) = 0;
     virtual void SetVmReady(void) = 0;
+    virtual void SetProcessEnv(std::vector<std::string> env) = 0;
     std::string GetName(void);
     uint32_t GetCid(void);
     VmState GetState(void);

@@ -6,6 +6,7 @@
  *
  */
 #include <string>
+#include <vector>
 #include <utility>
 
 #include <boost/process/environment.hpp>
@@ -16,6 +17,24 @@
 #include "utils/log.h"
 
 namespace vm_manager {
+
+std::vector<std::string> Client::GetGuestLists(void) {
+    std::vector<std::string> vms;
+    std::pair<bstring *, int> vm_lists = client_shm_.find<bstring>("ListVms");
+    for (auto i = 0; i < vm_lists.second; i++) {
+        vms.push_back(vm_lists.first[i].c_str());
+    }
+    return vms;
+}
+
+void Client::PrepareImportGuestClientShm(const char *cfg_path) {
+    client_shm_.destroy<bstring>("ImportVmCfgPath");
+    client_shm_.zero_free_memory();
+
+    bstring *var_name = client_shm_.construct<bstring>
+                ("ImportVmCfgPath")
+                (cfg_path, client_shm_.get_segment_manager());
+}
 
 void Client::PrepareStartGuestClientShm(const char *vm_name) {
     boost::process::environment env = boost::this_process::environment();

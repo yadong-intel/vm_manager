@@ -102,6 +102,93 @@ bool Server::SetupStartupListenerService(void) {
     return true;
 }
 
+int Server::ListVm(const char payload[]) {
+    boost::interprocess::managed_shared_memory shm(
+        boost::interprocess::open_only,
+        payload);
+
+    shm.destroy<bstring>("ListVms");
+    shm.zero_free_memory();
+
+    bstring *vm_lists = shm.construct<bstring>
+                ("ListVms")
+                [vmis_.size()]
+                (shm.get_segment_manager());
+
+    for (size_t i = 0; i < vmis_.size(); ++i) {
+        std::string s;
+        switch (vmis_[i]->GetState()) {
+        case VmBuilder::VmState::kVmEmpty:
+            s.assign(vmis_[i]->GetName() + ":Empty");
+            break;
+        case VmBuilder::VmState::kVmCreated:
+            s.assign(vmis_[i]->GetName() + ":Created");
+            break;
+        case VmBuilder::VmState::kVmBooting:
+            s.assign(vmis_[i]->GetName() + ":Booting");
+            break;
+        case VmBuilder::VmState::kVmRunning:
+            s.assign(vmis_[i]->GetName() + ":Running");
+            break;
+        case VmBuilder::VmState::kVmPaused:
+            s.assign(vmis_[i]->GetName() + ":Paused");
+            break;
+        }
+        vm_lists[i].assign(s.c_str());
+    }
+
+    return 0;
+}
+
+int Server::ImportVm(const char payload[]) {
+    boost::interprocess::managed_shared_memory shm(
+        boost::interprocess::open_read_only,
+        payload);
+
+    auto cfg_path = shm.find<bstring>("ImportVmCfgPath");
+
+    std::string p(cfg_path.first->c_str());
+
+    if (p.empty())
+        return -1;
+
+    CivConfig cfg;
+    if (!cfg.ReadConfigFile(p)) {
+        LOG(error) << "Failed to read config file";
+        return -1;
+    }
+
+    std::string vm_name(cfg.GetValue(kGroupGlob, kGlobName));
+    if (vm_name.empty())
+        return -1;
+
+    auto id = FindVmInstance(vm_name);
+    if (id != -1UL) {
+        VmBuilder::VmState st = vmis_[id].get()->GetState();
+        if ((st != VmBuilder::VmState::kVmCreated) && (st != VmBuilder::VmState::kVmEmpty)) {
+            LOG(error) << "CiV: " << vm_name << " is running! Cannot overwrite!";
+            return -1;
+        }
+        LOG(warning) << "Overwrite existed CiV: " << vm_name;
+        DeleteVmInstance(vm_name);
+    }
+
+    std::vector<std::unique_ptr<VmBuilder>>::iterator vmi;
+    if (cfg.GetValue(kGroupEmul, kEmulType) == kEmulTypeQemu) {
+        std::unique_ptr<VmBuilderQemu> vbq = std::make_unique<VmBuilderQemu>(vm_name, std::move(cfg));
+        if (!vbq->BuildVmArgs())
+            return -1;
+        vmi = vmis_.insert(vmis_.end(), std::move(vbq));
+    } else {
+        /* Default try to contruct for QEMU */
+        std::unique_ptr<VmBuilderQemu> vbq = std::make_unique<VmBuilderQemu>(vm_name, std::move(cfg));
+        if (!vbq->BuildVmArgs())
+            return -1;
+        vmi = vmis_.insert(vmis_.end(), std::move(vbq));
+    }
+    return 0;
+}
+
 void Server::VmThread(VmBuilder *vb, boost::latch *wait_continue, bool *vm_ready) {
     startup_listener_.listener.AddPendingVM(vb->GetCid(), [vb](){
         vb->SetVmReady();
@@ -128,16 +215,9 @@ int Server::StartVm(const char payload[]) {
         payload);
 
     auto vm_name = shm.find<bstring>("StartVmName");
-    if (FindVmInstance(std::string(vm_name.first->c_str())) != -1UL) {
-        LOG(warning) << "CiV: " << vm_name.first->c_str() << " is already running!";
-        return -1;
-    }
-
-    std::string cfg_file = GetConfigPath() + std::string("/") + vm_name.first->c_str() + ".ini";
-
-    CivConfig cfg;
-    if (!cfg.ReadConfigFile(cfg_file)) {
-        LOG(error) << "Failed to read config file";
+    auto id = FindVmInstance(std::string(vm_name.first->c_str()));
+    if (id == -1UL) {
+        LOG(warning) << "CiV: [" << vm_name.first->c_str() << "] Not Exists!";
         return -1;
     }
 
@@ -148,20 +228,8 @@ int Server::StartVm(const char payload[]) {
         env_data.push_back(std::string(vm_env.first[i].c_str()));
     }
 
-    std::vector<std::unique_ptr<VmBuilder>>::iterator vmi;
-    if (cfg.GetValue(kGroupEmul, kEmulType) == kEmulTypeQemu) {
-        vmi = vmis_.emplace(vmis_.end(),
-                    std::make_unique<VmBuilderQemu>(vm_name.first->c_str(), std::move(cfg), std::move(env_data)));
-    } else {
-        /* Default try to build args for QEMU */
-        vmi = vmis_.emplace(vmis_.end(),
-                    std::make_unique<VmBuilderQemu>(vm_name.first->c_str(), std::move(cfg), std::move(env_data)));
-    }
-
-    VmBuilder *vb = vmi->get();
-    /* Build VM releated Arguments */
-    if (!vb->BuildVmArgs())
-        return -1;
+    VmBuilder *vb = vmis_[id].get();
+    vb->SetProcessEnv(std::move(env_data));
 
     boost::latch wait_continue = 1;
     bool vm_ready = false;
@@ -234,6 +302,20 @@ void Server::Start(void) {
                 case kCiVMsgStopServer:
                     stop_server_ = true;
                     data.first->type = kCivMsgRespondSuccess;
+                    break;
+                case kCivMsgListVm:
+                    if (ListVm(data.first->payload) == 0) {
+                        data.first->type = kCivMsgRespondSuccess;
+                    } else {
+                        data.first->type = kCivMsgRespondFail;
+                    }
+                    break;
+                case kCivMsgImportVm:
+                    if (ImportVm(data.first->payload) == 0) {
+                        data.first->type = kCivMsgRespondSuccess;
+                    } else {
+                        data.first->type = kCivMsgRespondFail;
+                    }
                     break;
                 case kCivMsgStartVm:
                     if (StartVm(data.first->payload) == 0) {

@@ -56,7 +56,6 @@ void VmCoProcSimple::ThreadMon(void) {
             child_latch_.count_down();
         });
 
-
     c_->wait(ec);
 
     std::ofstream out(f_out, std::fstream::app);
@@ -79,6 +78,10 @@ void VmCoProcSimple::Join(void) {
         return;
     if (mon_->joinable())
         mon_->join();
+}
+
+void VmCoProcSimple::SetEnv(std::vector<std::string> env) {
+    env_data_ = env;
 }
 
 void VmCoProcSimple::Stop(void) {

@@ -371,19 +371,19 @@ void VmBuilderQemu::RunMediationSrv(void) {
     std::string batt_med = cfg_.GetValue(kGroupMed, kMedBattery);
     if (batt_med.empty())
         return;
-    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(batt_med, env_data_));
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(batt_med));
 
     std::string ther_med = cfg_.GetValue(kGroupMed, kMedThermal);
     if (ther_med.empty())
         return;
-    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(ther_med, env_data_));
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(ther_med));
 }
 
 void VmBuilderQemu::BuildGuestTimeKeepCmd(void) {
     std::string tk = cfg_.GetValue(kGroupService, kServTimeKeep);
     if (tk.empty())
         return;
-    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(tk, env_data_));
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(tk));
     emul_cmd_.append(" -qmp pipe:/tmp/qmp-time-keep-pipe");
 }
 
@@ -391,7 +391,7 @@ void VmBuilderQemu::BuildGuestPmCtrlCmd(void) {
     std::string pm = cfg_.GetValue(kGroupService, kServPmCtrl);
     if (pm.empty())
         return;
-    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(pm, env_data_));
+    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(pm));
     emul_cmd_.append(" -qmp unix:/tmp/qmp-pm-sock,server=on,wait=off -no-reboot");
 }
 
@@ -435,7 +435,7 @@ void VmBuilderQemu::SetExtraServices(void) {
         if (it->empty())
             continue;
 
-        co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(*it, env_data_));
+        co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(*it));
     }
 }
 
@@ -533,7 +533,7 @@ void VmBuilderQemu::BuildRpmbCmd(void) {
                          " -chardev socket,id=rpmb0,path=" +
                            rpmb_data + "/" + std::string(kRpmbSock));
     }
-    co_procs_.emplace_back(std::make_unique<VmCoProcRpmb>(std::move(rpmb_bin), std::move(rpmb_data), env_data_));
+    co_procs_.emplace_back(std::make_unique<VmCoProcRpmb>(std::move(rpmb_bin), std::move(rpmb_data)));
 }
 
 void VmBuilderQemu::BuildVtpmCmd(void) {
@@ -544,7 +544,7 @@ void VmBuilderQemu::BuildVtpmCmd(void) {
                          vtpm_data + "/" + kVtpmSock +
                          " -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-crb,tpmdev=tpm0");
     }
-    co_procs_.emplace_back(std::make_unique<VmCoProcVtpm>(std::move(vtpm_bin), std::move(vtpm_data), env_data_));
+    co_procs_.emplace_back(std::make_unique<VmCoProcVtpm>(std::move(vtpm_bin), std::move(vtpm_data)));
 }
 
 void VmBuilderQemu::BuildAafCfg(void) {
@@ -696,11 +696,15 @@ bool VmBuilderQemu::BuildVmArgs(void) {
     if (aaf_cfg_)
         aaf_cfg_->Flush();
 
-    main_proc_ = std::make_unique<VmCoProcSimple>(emul_cmd_, env_data_);
+    main_proc_ = std::make_unique<VmCoProcSimple>(emul_cmd_);
 
     state_ = VmBuilder::VmState::kVmCreated;
 
     return true;
+}
+
+void VmBuilderQemu::SetProcessEnv(std::vector<std::string> env) {
+    main_proc_->SetEnv(env);
 }
 
 void VmBuilderQemu::StartVm() {

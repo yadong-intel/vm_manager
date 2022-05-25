@@ -37,9 +37,57 @@ bool IsServerRunning() {
         c.Notify(kCivMsgTest);
         return true;
     } catch (std::exception& e) {
-        LOG(warning) << "Server is not running: " << e.what();
+        // LOG(warning) << "Server is not running: " << e.what();
         return false;
     }
+}
+
+static void ListGuest(void) {
+    if (!IsServerRunning()) {
+        LOG(info) << "server is not running! Please start server!";
+        return;
+    }
+
+    Client c;
+    if (c.Notify(kCivMsgListVm)) {
+        LOG(info) << "List guest: " << " Done.";
+    } else {
+        LOG(error) << "List guest: " << " Failed!";
+    }
+    auto vm_list = c.GetGuestLists();
+    std::cout << "=====================" << std::endl;
+    for (auto it : vm_list) {
+        std::cout << it << std::endl;
+    }
+    return;
+}
+
+static void ImportGuest(std::string path) {
+    if (!IsServerRunning()) {
+        LOG(info) << "server is not running! Please start server!";
+        return;
+    }
+
+    boost::system::error_code ec;
+    boost::filesystem::path p(path);
+
+    if (!boost::filesystem::exists(p, ec)) {
+        p.clear();
+        p.assign(GetConfigPath() + std::string("/") + path + ".ini");
+        if (!boost::filesystem::exists(p, ec)) {
+            LOG(error) << "Cannot Import: " << path;
+            return;
+        }
+    }
+
+    Client c;
+    c.PrepareImportGuestClientShm(boost::filesystem::absolute(p).c_str());
+    if (c.Notify(kCivMsgImportVm)) {
+        LOG(info) << "Import guest: " << path << " Done.";
+    } else {
+        LOG(error) << "Import guest: " << path << " Failed!";
+    }
+    return;
 }
 
 static void StartGuest(std::string name) {
@@ -161,6 +209,7 @@ class CivOptions final {
         }
 
         if (vm_.count("import")) {
+            ImportGuest(vm_["import"].as<std::string>());
             return;
         }
 
@@ -187,6 +236,7 @@ class CivOptions final {
         }
 
         if (vm_.count("list")) {
+            ListGuest();
             return;
         }
 

@@ -43,6 +43,8 @@ class Server final {
     size_t FindVmInstance(std::string name);
     void DeleteVmInstance(std::string name);
 
+    int ListVm(const char payload[]);
+    int ImportVm(const char payload[]);
     int StartVm(const char payload[]);
     int StopVm(const char payload[]);
 
