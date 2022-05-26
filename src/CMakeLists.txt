@@ -11,7 +11,7 @@ cmake_minimum_required(VERSION 3.10)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(BoostCMake)
 include(FTXUICMake)
-include(gRPCCMake)
+include(gRPCFetchCMake)
 
 add_subdirectory(services/protos)
 
@@ -42,6 +42,7 @@ target_link_libraries(${PROJECT_NAME}
   PRIVATE ep_boost::thread
   PRIVATE ep_boost::filesystem
   PRIVATE ep_boost::chrono
+
   #PRIVATE grpc++
   vm_host_grpc_proto
   #PRIVATE ${_REFLECTION}

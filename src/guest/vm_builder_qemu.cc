@@ -467,7 +467,9 @@ void VmBuilderQemu::BuildFixedCmd(void) {
         " -enable-kvm"
         " -device qemu-xhci,id=xhci,p2=8,p3=8"
         " -device usb-mouse"
-        " -device usb-kbd"
+        " -device usb-kbd");
+    emul_cmd_.append(
+        /* Make sure this device be the last argument */
         " -device intel-iommu,device-iotlb=on,caching-mode=on"
         " -nodefaults ");
 }
@@ -550,7 +552,7 @@ void VmBuilderQemu::BuildVtpmCmd(void) {
 void VmBuilderQemu::BuildAafCfg(void) {
     std::string aaf_path = cfg_.GetValue(kGroupAaf, kAafPath);
     if (!aaf_path.empty()) {
-        emul_cmd_.append(" -virtfs local,mount_tag=Download9p,security_model=none,path=" + aaf_path); //,addr=3
+        emul_cmd_.append(" -virtfs local,mount_tag=aaf,security_model=none,path=" + aaf_path);
         aaf_cfg_ = std::make_unique<Aaf>(aaf_path.c_str());
 
         std::string aaf_suspend = cfg_.GetValue(kGroupAaf, kAafSuspend);
@@ -652,8 +654,6 @@ bool VmBuilderQemu::BuildVmArgs(void) {
 
     BuildRpmbCmd();
 
-    BuildFixedCmd();
-
     BuildAafCfg();
 
     if (!BuildNameQmp())
@@ -690,6 +690,8 @@ bool VmBuilderQemu::BuildVmArgs(void) {
     BuildAudioCmd();
 
     BuildExtraCmd();
+
+    BuildFixedCmd();
 
     SetExtraServices();
 
