@@ -110,7 +110,7 @@ static bool IsVfioDriver(const char *path) {
 
 static int ReadSysFile(const char *sys_file, std::ios_base::fmtflags base) {
     try {
-        std::ifstream ifs(sys_file, std::ios_base::in);
+        std::ifstream ifs(sys_file, std::ofstream::in);
         ifs.setf(base, std::ios_base::basefield);
         int ret;
         ifs >> ret;
@@ -123,8 +123,9 @@ static int ReadSysFile(const char *sys_file, std::ios_base::fmtflags base) {
 
 static int WriteSysFile(const char *sys_file, const std::string &str) {
     try {
-        std::ofstream of(sys_file, std::ios_base::out);
+        std::ofstream of(sys_file, std::ofstream::out);
         of << str;
+        of.flush();
         return 0;
     } catch (std::exception &e) {
         LOG(error) << e.what();
@@ -278,9 +279,9 @@ static bool PassthroughOnePciDev(const char *pci_id, PciPassthroughAction action
         return false;
 
     boost::filesystem::path p(kPciDevicePath);
-    p.append(pci_id).append("/iommu_group/device");
+    p.append(pci_id).append("/iommu_group/devices");
 
-    if (!boost::filesystem::exists(p) || boost::filesystem::is_directory(p)) {
+    if (!boost::filesystem::exists(p) || !boost::filesystem::is_directory(p)) {
         return false;
     }
 
@@ -290,7 +291,7 @@ static bool PassthroughOnePciDev(const char *pci_id, PciPassthroughAction action
         int device = ReadSysFile(str_dev.c_str(), std::ios_base::hex);
         std::string str_ven(x.path().string() + "/vendor");
         int vendor = ReadSysFile(str_ven.c_str(), std::ios_base::hex);
-        std::string ven_dev(std::to_string(vendor) + " " + std::to_string(device));
+        std::string ven_dev((boost::format("%x") % vendor).str() + " " + (boost::format("%x") % device).str());
 
         boost::filesystem::path driver(x.path().string() + "/driver");
 
@@ -312,18 +313,30 @@ static bool PassthroughOnePciDev(const char *pci_id, PciPassthroughAction action
                 WriteSysFile(kVfioPciRemoveId, ven_dev);
             }
             std::string drv_unbind = driver.string() + "/unbind";
-            WriteSysFile(kVfioPciUnbind, x.path().filename().string());
+            LOG(info) << "Unbind PCI driver - " << x.path().filename().string();
+            WriteSysFile(drv_unbind.c_str(), x.path().filename().string());
 
-            /* TODO: check whether unbind successfully instead of sleep */
-            sleep(1);
-
-            int errno_saved = WriteSysFile(kVfioPciNewId, ven_dev);
-            if (errno_saved == EEXIST) {
-                WriteSysFile(kVfioPciRemoveId, ven_dev);
-                WriteSysFile(kVfioPciNewId, ven_dev);
-            } else if (errno_saved != 0) {
+            /* wait driver to be unbinded */
+            constexpr const int kCheckUnbindRepeatCount = 2000;
+            int cnt = 0;
+            while (cnt < kCheckUnbindRepeatCount) {
+                if (!boost::filesystem::exists(driver))
+                    break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                cnt++;
+            }
+            if (cnt >= kCheckUnbindRepeatCount) {
+                LOG(error) << "Failed to unbind - " << x.path().filename().string();
                 return false;
             }
+        }
+
+        int errno_saved = WriteSysFile(kVfioPciNewId, ven_dev);
+        if (errno_saved == EEXIST) {
+            WriteSysFile(kVfioPciRemoveId, ven_dev);
+            WriteSysFile(kVfioPciNewId, ven_dev);
+        } else if (errno_saved != 0) {
+            return false;
         }
     }
 
@@ -344,6 +357,8 @@ void VmBuilderQemu::BuildPtPciDevicesCmd(void) {
         if (PassthroughOnePciDev(it->c_str(), kPciPassthrough)) {
             pci_pt_dev_set_.insert(*it);
             emul_cmd_.append(" -device vfio-pci,host=" + *it + ",x-no-kvm-intx=on");
+        } else {
+            LOG(warning) << "Failed to passthrough: " << *it;
         }
     }
 }
@@ -487,11 +502,15 @@ bool VmBuilderQemu::BuildNameQmp(void) {
 }
 
 void VmBuilderQemu::BuildNetCmd(void) {
+    std::string model = cfg_.GetValue(kGroupNet, kNetModel);
+    if (model.empty())
+        return;
+
     std::string net_arg = " -netdev user,id=net0";
-    std::string adb_port = cfg_.GetValue(kGroupGlob, kGlobAdbPort);
+    std::string adb_port = cfg_.GetValue(kGroupNet, kNetAdbPort);
     if (!adb_port.empty())
         net_arg.append(",hostfwd=tcp::" + adb_port + "-:5555");
-    std::string fb_port = cfg_.GetValue(kGroupGlob, kGlobFastbootPort);
+    std::string fb_port = cfg_.GetValue(kGroupNet, kNetFastbootPort);
     if (!fb_port.empty())
         net_arg.append(",hostfwd=tcp::" + fb_port + "-:5554");
 

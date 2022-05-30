@@ -27,25 +27,16 @@ std::vector<std::string> Client::GetGuestLists(void) {
     return vms;
 }
 
-void Client::PrepareImportGuestClientShm(const char *cfg_path) {
-    client_shm_.destroy<bstring>("ImportVmCfgPath");
-    client_shm_.zero_free_memory();
-
-    bstring *var_name = client_shm_.construct<bstring>
-                ("ImportVmCfgPath")
-                (cfg_path, client_shm_.get_segment_manager());
-}
-
-void Client::PrepareStartGuestClientShm(const char *vm_name) {
+void Client::PrepareStartGuestClientShm(const char *path) {
     boost::process::environment env = boost::this_process::environment();
 
-    client_shm_.destroy<bstring>("StartVmName");
+    client_shm_.destroy<bstring>("StartVmCfgPath");
     client_shm_.destroy<bstring>("StartVmEnv");
     client_shm_.zero_free_memory();
 
     bstring *var_name = client_shm_.construct<bstring>
-                ("StartVmName")
-                (vm_name, client_shm_.get_segment_manager());
+                ("StartVmCfgPath")
+                (path, client_shm_.get_segment_manager());
 
     bstring *var_env = client_shm_.construct<bstring>
                 ("StartVmEnv")

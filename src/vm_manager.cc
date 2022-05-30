@@ -49,10 +49,9 @@ static void ListGuest(void) {
     }
 
     Client c;
-    if (c.Notify(kCivMsgListVm)) {
-        LOG(info) << "List guest: " << " Done.";
-    } else {
+    if (!c.Notify(kCivMsgListVm)) {
         LOG(error) << "List guest: " << " Failed!";
+        return;
     }
     auto vm_list = c.GetGuestLists();
     std::cout << "=====================" << std::endl;
@@ -62,7 +61,36 @@ static void ListGuest(void) {
     return;
 }
 
-static void ImportGuest(std::string path) {
+static int GetGuestState(std::string name) {
+    if (name.empty())
+        return -1;
+    if (!IsServerRunning()) {
+        LOG(info) << "server is not running! Please start server!";
+        return -1;
+    }
+
+    Client c;
+    if (!c.Notify(kCivMsgListVm)) {
+        LOG(error) << "List guest: " << " Failed!";
+    }
+    auto vm_list = c.GetGuestLists();
+    for (auto it : vm_list) {
+        std::vector<std::string> sp;
+        boost::split(sp, it, boost::is_any_of(":"));
+        if (sp.size() != 2)
+            continue;
+        if (sp[0].compare(name) == 0) {
+            for (auto i = 0; i < VmBuilder::kVmUnknown; i++) {
+                if (sp[1].compare(kVmStateArr[i]) == 0) {
+                    return i;
+                }
+            }
+        }
+    }
+    return VmBuilder::kVmUnknown;
+}
+
+static void StartGuest(std::string path) {
     if (!IsServerRunning()) {
         LOG(info) << "server is not running! Please start server!";
         return;
@@ -75,33 +103,17 @@ static void ImportGuest(std::string path) {
         p.clear();
         p.assign(GetConfigPath() + std::string("/") + path + ".ini");
         if (!boost::filesystem::exists(p, ec)) {
-            LOG(error) << "Cannot Import: " << path;
+            LOG(error) << "CiV config not exists: " << path;
             return;
         }
     }
 
     Client c;
-    c.PrepareImportGuestClientShm(boost::filesystem::absolute(p).c_str());
-    if (c.Notify(kCivMsgImportVm)) {
-        LOG(info) << "Import guest: " << path << " Done.";
-    } else {
-        LOG(error) << "Import guest: " << path << " Failed!";
-    }
-    return;
-}
-
-static void StartGuest(std::string name) {
-    if (!IsServerRunning()) {
-        LOG(info) << "server is not running! Please start server!";
-        return;
-    }
-
-    Client c;
-    c.PrepareStartGuestClientShm(name.c_str());
+    c.PrepareStartGuestClientShm(p.c_str());
     if (c.Notify(kCivMsgStartVm)) {
-        LOG(info) << "Start guest: " << name << " Done.";
+        LOG(info) << "Start guest: " << path << " Done.";
     } else {
-        LOG(error) << "Start guest: " << name << " Failed!";
+        LOG(error) << "Start guest: " << path << " Failed!";
     }
     return;
 }
@@ -172,7 +184,6 @@ class CivOptions final {
         cmdline_options_.add_options()
             ("help,h",    "Show ths help message")
             ("create,c",  po::value<std::string>(), "Create a CiV guest")
-            ("import,i",  po::value<std::string>(), "Import a CiV guest from existing config file")
             ("delete,d",  po::value<std::string>(), "Delete a CiV guest")
             ("start,b",   po::value<std::string>(), "Start a CiV guest")
             ("stop,q",    po::value<std::string>(), "Stop a CiV guest")
@@ -205,11 +216,6 @@ class CivOptions final {
         if (vm_.count("create")) {
             CivTui ct;
             ct.InitializeUi();
-            return;
-        }
-
-        if (vm_.count("import")) {
-            ImportGuest(vm_["import"].as<std::string>());
             return;
         }
 
@@ -261,7 +267,7 @@ class CivOptions final {
     void PrintHelp(void) {
         std::cout << "Usage:\n";
         std::cout << "  vm-manager"
-                  << " [-c] [-i config_file_path] [-d vm_name] [-b vm_name] [-q vm_name] [-f vm_name] [-u vm_name]"
+                  << " [-c] [-d vm_name] [-b vm_name] [-q vm_name] [-f vm_name] [-u vm_name]"
                   << " [-l] [-v] [-h]\n";
         std::cout << "Options:\n";
 

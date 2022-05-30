@@ -13,6 +13,7 @@
 #include <vector>
 #include <utility>
 #include <exception>
+#include <map>
 
 #include <boost/thread.hpp>
 #include <boost/process.hpp>
@@ -25,12 +26,13 @@ namespace vm_manager {
 
 class VmBuilder {
  public:
-    enum class VmState {
-       kVmEmpty = 0,
-       kVmCreated,
-       kVmBooting,
-       kVmRunning,
-       kVmPaused,
+    enum VmState {
+        kVmEmpty = 0,
+        kVmCreated,
+        kVmBooting,
+        kVmRunning,
+        kVmPaused,
+        kVmUnknown,
     };
 
  public:
@@ -53,6 +55,15 @@ class VmBuilder {
     uint32_t vsock_cid_;
     VmState state_ = VmBuilder::VmState::kVmEmpty;
     std::mutex state_lock_;
+};
+
+inline constexpr const char *kVmStateArr[] = {
+    [VmBuilder::kVmEmpty] = "Empty",
+    [VmBuilder::kVmCreated] = "Created",
+    [VmBuilder::kVmBooting] = "Booting",
+    [VmBuilder::kVmRunning] = "Running",
+    [VmBuilder::kVmPaused] = "Paused",
+    [VmBuilder::kVmUnknown] = "Unknown",
 };
 
 }  // namespace vm_manager

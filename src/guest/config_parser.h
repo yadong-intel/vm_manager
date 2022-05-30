@@ -22,6 +22,7 @@ constexpr char kGroupVcpu[]    = "vcpu";
 constexpr char kGroupFirm[]    = "firmware";
 constexpr char kGroupDisk[]    = "disk";
 constexpr char kGroupVgpu[]    = "graphics";
+constexpr char kGroupNet[]     = "net";
 constexpr char kGroupVtpm[]    = "vtpm";
 constexpr char kGroupRpmb[]    = "rpmb";
 constexpr char kGroupAaf[]     = "aaf";
@@ -33,9 +34,8 @@ constexpr char kGroupExtra[]   = "extra";
 /* Keys */
 constexpr char kGlobName[]       = "name";
 constexpr char kGlobFlashfiles[] = "flashfiles";
-constexpr char kGlobAdbPort[]        = "adb_port";
-constexpr char kGlobFastbootPort[]   = "fastboot_port";
 constexpr char kGlobCid[]        = "vsock_cid";
+constexpr char kGlobWaitReady[]  = "wait_ready";
 
 constexpr char kEmulType[] = "type";
 constexpr char kEmulPath[] = "path";
@@ -56,6 +56,10 @@ constexpr char kVgpuType[]    = "type";
 constexpr char kVgpuGvtgVer[] = "gvtg_version";
 constexpr char kVgpuUuid[]    = "vgpu_uuid";
 constexpr char kVgpuMonId[]    = "monitor";
+
+constexpr char kNetModel[] = "model";
+constexpr char kNetAdbPort[] = "adb";
+inline constexpr char kNetFastbootPort[] = "fastboot";
 
 constexpr char kVtpmBinPath[] = "bin_path";
 constexpr char kVtpmDataDir[] = "data_dir";

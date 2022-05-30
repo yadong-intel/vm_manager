@@ -42,13 +42,13 @@ size_t Server::FindVmInstance(std::string name) {
         if (vmis_[i]->GetName().compare(name) == 0)
             return i;
     }
-    return -1;
+    return -1UL;
 }
 
 void Server::DeleteVmInstance(std::string name) {
     std::scoped_lock lock(vmis_mutex_);
-    int index = FindVmInstance(name);
-    if (index == -1)
+    size_t index = FindVmInstance(name);
+    if (index == -1UL)
         return;
     vmis_.erase(vmis_.begin() + index);
 }
@@ -59,12 +59,12 @@ int Server::StopVm(const char payload[]) {
         payload);
     std::pair<bstring *, int> vm_name;
     vm_name = shm.find<bstring>("StopVmName");
-    int id = FindVmInstance(std::string(vm_name.first->c_str()));
-    if (id != -1) {
+    size_t id = FindVmInstance(std::string(vm_name.first->c_str()));
+    if (id != -1UL) {
         vmis_[id]->StopVm();
-    }
-    if (id == -1)
+    } else {
         LOG(warning) << "CiV: " << vm_name.first->c_str() << " is not running!";
+    }
     return 0;
 }
 
@@ -116,24 +116,7 @@ int Server::ListVm(const char payload[]) {
                 (shm.get_segment_manager());
 
     for (size_t i = 0; i < vmis_.size(); ++i) {
-        std::string s;
-        switch (vmis_[i]->GetState()) {
-        case VmBuilder::VmState::kVmEmpty:
-            s.assign(vmis_[i]->GetName() + ":Empty");
-            break;
-        case VmBuilder::VmState::kVmCreated:
-            s.assign(vmis_[i]->GetName() + ":Created");
-            break;
-        case VmBuilder::VmState::kVmBooting:
-            s.assign(vmis_[i]->GetName() + ":Booting");
-            break;
-        case VmBuilder::VmState::kVmRunning:
-            s.assign(vmis_[i]->GetName() + ":Running");
-            break;
-        case VmBuilder::VmState::kVmPaused:
-            s.assign(vmis_[i]->GetName() + ":Paused");
-            break;
-        }
+        std::string s(vmis_[i]->GetName() + ":" + kVmStateArr[vmis_[i]->GetState()]);
         vm_lists[i].assign(s.c_str());
     }
 
@@ -189,23 +172,29 @@ int Server::ImportVm(const char payload[]) {
     return 0;
 }
 
-void Server::VmThread(VmBuilder *vb, boost::latch *wait_continue, bool *vm_ready) {
-    startup_listener_.listener.AddPendingVM(vb->GetCid(), [vb](){
-        vb->SetVmReady();
-    });
-
+void Server::VmThread(VmBuilder *vb, boost::latch *notify_cont) {
     LOG(info) << "Starting VM:  " << vb->GetName();
     /* Start VM */
     vb->StartVm();
 
+    if (notify_cont->try_count_down()) {
+        vb->SetVmReady();
+        vb->WaitVmExit();
+        DeleteVmInstance(vb->GetName());
+        return;
+    }
+
+    startup_listener_.listener.AddPendingVM(vb->GetCid(), [vb](){
+        vb->SetVmReady();
+    });
+
     if (vb->WaitVmReady()) {
-        *vm_ready = true;
-        wait_continue->try_count_down();
+        notify_cont->try_count_down();
         vb->WaitVmExit();
         DeleteVmInstance(vb->GetName());
     } else {
         DeleteVmInstance(vb->GetName());
-        wait_continue->try_count_down();
+        notify_cont->try_count_down();
     }
 }
 
@@ -214,11 +203,40 @@ int Server::StartVm(const char payload[]) {
         boost::interprocess::open_read_only,
         payload);
 
-    auto vm_name = shm.find<bstring>("StartVmName");
-    auto id = FindVmInstance(std::string(vm_name.first->c_str()));
-    if (id == -1UL) {
-        LOG(warning) << "CiV: [" << vm_name.first->c_str() << "] Not Exists!";
+    auto cfg_path = shm.find<bstring>("StartVmCfgPath");
+
+    std::string p(cfg_path.first->c_str());
+
+    if (p.empty())
         return -1;
+
+    CivConfig cfg;
+    if (!cfg.ReadConfigFile(p)) {
+        LOG(error) << "Failed to read config file";
+        return -1;
+    }
+
+    std::string vm_name(cfg.GetValue(kGroupGlob, kGlobName));
+    if (vm_name.empty())
+        return -1;
+
+    if (FindVmInstance(vm_name) != -1UL) {
+        LOG(error) << vm_name << " is already running!";
+        return -1;
+    }
+
+    std::vector<std::unique_ptr<VmBuilder>>::iterator vmi;
+    if (cfg.GetValue(kGroupEmul, kEmulType) == kEmulTypeQemu) {
+        std::unique_ptr<VmBuilderQemu> vbq = std::make_unique<VmBuilderQemu>(vm_name, cfg);
+        if (!vbq->BuildVmArgs())
+            return -1;
+        vmi = vmis_.insert(vmis_.end(), std::move(vbq));
+    } else {
+        /* Default try to contruct for QEMU */
+        std::unique_ptr<VmBuilderQemu> vbq = std::make_unique<VmBuilderQemu>(vm_name, cfg);
+        if (!vbq->BuildVmArgs())
+            return -1;
+        vmi = vmis_.insert(vmis_.end(), std::move(vbq));
     }
 
     std::pair<bstring *, int> vm_env = shm.find<bstring>("StartVmEnv");
@@ -228,34 +246,25 @@ int Server::StartVm(const char payload[]) {
         env_data.push_back(std::string(vm_env.first[i].c_str()));
     }
 
-    VmBuilder *vb = vmis_[id].get();
+    VmBuilder *vb = vmi->get();
     vb->SetProcessEnv(std::move(env_data));
 
-    boost::latch wait_continue = 1;
-    bool vm_ready = false;
+    boost::latch notify_cont(1);
+    if (cfg.GetValue(kGroupGlob, kGlobWaitReady).compare("true") == 0) {
+        notify_cont.reset(2);
+    }
 
-    boost::thread t([this, vb, &wait_continue, &vm_ready]() {
-        VmThread(vb, &wait_continue, &vm_ready);
+    boost::thread t([this, vb, &notify_cont]() {
+        VmThread(vb, &notify_cont);
     });
     t.detach();
 
-    wait_continue.wait();
+    notify_cont.wait();
 
-    if (vm_ready) {
+    if (vb->GetState() == VmBuilder::VmState::kVmRunning) {
         return 0;
     }
     return -1;
-#if 0
-    if (wait_continue.wait_for(boost::chrono::seconds(200)) == boost::cv_status::timeout) {
-        LOG(error) << "CiV[" << vb->GetName() << "]" << " Failed to bootup!";
-        startup_listener_.listener.RemovePendingVM(vb->GetCid());
-        return -1;
-    }
-    LOG(info) << "CiV[" << vb->GetName() << "]" << " is ready!";
-    t.detach();
-
-    return 0;
-#endif
 }
 
 static void HandleSIG(int num) {

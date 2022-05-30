@@ -14,6 +14,7 @@
 #include <string_view>
 #include <filesystem>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 
 #include "guest/config_parser.h"
@@ -27,13 +28,14 @@ using std::string_view;
 using boost::property_tree::ptree;
 
 map<string_view, vector<string_view>> kConfigMap = {
-    { kGroupGlob,    { kGlobName, kGlobFlashfiles, kGlobAdbPort, kGlobFastbootPort, kGlobCid } },
+    { kGroupGlob,    { kGlobName, kGlobFlashfiles, kGlobCid, kGlobWaitReady } },
     { kGroupEmul,    { kEmulType, kEmulPath } },
     { kGroupMem,     { kMemSize } },
     { kGroupVcpu,    { kVcpuNum } },
     { kGroupFirm,    { kFirmType, kFirmPath, kFirmCode, kFirmVars } },
     { kGroupDisk,    { kDiskSize, kDiskPath } },
     { kGroupVgpu,    { kVgpuType, kVgpuGvtgVer, kVgpuUuid } },
+    { kGroupNet,     { kNetModel, kNetAdbPort, kNetFastbootPort } },
     { kGroupVtpm,    { kVtpmBinPath, kVtpmDataDir } },
     { kGroupRpmb,    { kRpmbBinPath, kRpmbDataDir } },
     { kGroupAaf,     { kAafPath, kAafSuspend }},
@@ -65,7 +67,7 @@ bool CivConfig::SanitizeOpts(void) {
 }
 
 bool CivConfig::ReadConfigFile(std::string path) {
-    if (!std::filesystem::exists(path)){
+    if (!std::filesystem::exists(path)) {
         LOG(error) << "File not exists: " << path << std::endl;
         return false;
     }
@@ -86,7 +88,7 @@ bool CivConfig::ReadConfigFile(std::string path) {
 }
 
 bool CivConfig::WriteConfigFile(std::string path) {
-    if (!std::filesystem::exists(path)){
+    if (!std::filesystem::exists(path)) {
         LOG(error) << "File not exists: " << path << std::endl;
         return false;
     }
@@ -112,6 +114,7 @@ bool CivConfig::WriteConfigFile(std::string path) {
 std::string CivConfig::GetValue(std::string group, std::string key) {
     try {
         std::string val = cfg_data_.get<std::string>(group + "." + key);
+        boost::trim(val);
         return val;
     } catch(const std::exception& e) {
         LOG(warning) << e.what();

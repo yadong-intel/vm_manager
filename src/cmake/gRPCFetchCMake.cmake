@@ -47,6 +47,7 @@ if (NOT grpc_POPULATED)
     apply_git_patch(${grpc_SOURCE_DIR} ${file})
   endforeach()
 
+  set(gRPC_BUILD_TESTS OFF)
   add_subdirectory(${grpc_SOURCE_DIR} ${grpc_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
