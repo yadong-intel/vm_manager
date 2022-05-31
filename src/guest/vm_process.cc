@@ -42,7 +42,17 @@ void VmCoProcSimple::ThreadMon(void) {
 
     std::string tid = boost::lexical_cast<std::string>(mon_->get_id());
 
-    std::string f_out = "/tmp/" + std::string(basename(exe.c_str())) + "_" + t_buf + "_" + tid + "_out.log";
+    std::string f_out = log_dir_ + std::string(basename(exe.c_str())) + "_" + t_buf + "_" + tid + "_out.log";
+    std::ofstream fo(f_out);
+    fo.close();
+
+    boost::filesystem::permissions(f_out, boost::filesystem::perms::owner_read |
+                                          boost::filesystem::perms::owner_write |
+                                          boost::filesystem::perms::group_read |
+                                          boost::filesystem::perms::group_write |
+                                          boost::filesystem::perms::others_read |
+                                          boost::filesystem::perms::others_write |
+                                          boost::filesystem::add_perms);
 
     c_ = std::make_unique<boost::process::child>(
         cmd_,
@@ -54,7 +64,7 @@ void VmCoProcSimple::ThreadMon(void) {
         },
         boost::process::extend::on_error = [this](auto & exec, const std::error_code& ec) {
             child_latch_.count_down();
-        });
+    });
 
     c_->wait(ec);
 
@@ -82,6 +92,22 @@ void VmCoProcSimple::Join(void) {
 
 void VmCoProcSimple::SetEnv(std::vector<std::string> env) {
     env_data_ = env;
+}
+
+void VmCoProcSimple::SetLogDir(const char *path) {
+    if (!path)
+        return;
+
+    boost::filesystem::path p(path);
+    if (boost::filesystem::exists(p)) {
+        if (!boost::filesystem::is_directory(p))
+            return;
+    } else {
+        if (!boost::filesystem::create_directories(p))
+            return;
+    }
+
+    log_dir_.assign(boost::filesystem::absolute(p).c_str()).append("/");
 }
 
 void VmCoProcSimple::Stop(void) {

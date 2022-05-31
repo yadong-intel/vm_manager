@@ -67,6 +67,7 @@ class VmBuilderQemu : public VmBuilder {
     bool SetupSriov(void);
     void RunMediationSrv(void);
     void SetExtraServices(void);
+    void SetProcLogDir(void);
 
     CivConfig cfg_;
     std::unique_ptr<Aaf> aaf_cfg_;

@@ -8,6 +8,12 @@
 
 cmake_minimum_required(VERSION 3.10)
 
+set (CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)
+
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+   SET(CMAKE_BUILD_TYPE Release)
+endif(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(BoostCMake)
 include(FTXUICMake)
@@ -18,6 +24,9 @@ add_subdirectory(services/protos)
 set(PROJECT_NAME "vm-manager")
 project(${PROJECT_NAME})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-variable -Wno-narrowing")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Wno-unused-variable -Wno-narrowing")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2 -g")
+message(${CMAKE_CXX_FLAGS_RELEASE})
 
 find_package(PkgConfig REQUIRED)
 include_directories(${DEPS_INCS_INCLUDE_DIRS})
@@ -50,6 +59,7 @@ target_link_libraries(${PROJECT_NAME}
   #PRIVATE ${_PROTOBUF_LIBPROTOBUF}
   -lrt
 )
+set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
 
 install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION bin

@@ -35,8 +35,8 @@ jobs:
        export CXX=/usr/bin/clang++
        mkdir vm-manager/build/
        cd vm-manager/build/
-       cmake ..
-       cmake --build .
+       cmake -DCMAKE_BUILD_TYPE=Release ..
+       cmake --build . --config Release
        cd -
 
     # Initializes the CodeQL tools for scanning.
@@ -49,7 +49,7 @@ jobs:
     - run: |
        cd vm-manager/build/
        find src/CMakeFiles/vm-manager.dir/ -iname *.o |xargs rm
-       cmake --build .
+       cmake --build . --config Release
 
     # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
     # If this step fails, then you should remove it and run the build manually (see below)

@@ -31,6 +31,7 @@ class VmProcess {
     virtual void Stop(void) = 0;
     virtual bool Running(void) = 0;
     virtual void Join(void) = 0;
+    virtual void SetLogDir(const char *path) = 0;
     virtual void SetEnv(std::vector<std::string> env) = 0;
     virtual ~VmProcess() = default;
 };
@@ -43,7 +44,9 @@ class VmCoProcSimple : public VmProcess {
     bool Running(void);
     void Join(void);
     void SetEnv(std::vector<std::string> env);
+    void SetLogDir(const char *path);
     virtual ~VmCoProcSimple();
+
  protected:
     VmCoProcSimple(const VmCoProcSimple&) = delete;
     VmCoProcSimple& operator=(const VmCoProcSimple&) = delete;
@@ -53,9 +56,11 @@ class VmCoProcSimple : public VmProcess {
 
     std::string cmd_;
     std::vector<std::string> env_data_;
+    std::string log_dir_ = "/tmp/";
 
     std::unique_ptr<boost::process::child> c_;
     boost::latch child_latch_;
+
  private:
     std::unique_ptr<boost::thread> mon_;
 };

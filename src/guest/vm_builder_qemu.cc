@@ -212,13 +212,6 @@ static int SetAvailableVf(void) {
 
     std::string id("8086 " + (boost::format("%x") % dev_id).str());
 
-    WriteSysFile(kVfioPciNewId, id);
-
-    if (IsVfioDriver(kIntelGpuDriver)) {
-        WriteSysFile(kVfioPciRemoveId, id);
-    }
-    WriteSysFile(kIntelGpuDriverUnbind, kIntelGpuBdf);
-
     int errno_saved = WriteSysFile(kVfioPciNewId, id);
     if (errno_saved == EEXIST) {
         WriteSysFile(kVfioPciRemoveId, id);
@@ -227,10 +220,10 @@ static int SetAvailableVf(void) {
         return false;
     }
 
-    std::string sriov_dev(kIntelGpuDevPath);
-    for (int i = 0; i < totalvfs; i++) {
-        sriov_dev.append("." + std::to_string(i) + "/enable");
-        int status = ReadSysFile(sriov_dev.c_str(), std::ios_base::dec);
+    for (int i = 1; i < totalvfs; i++) {
+        std::string sd(kIntelGpuDevPath);
+        sd.replace(sd.end() - 1, sd.end(), std::to_string(i) + "/enable");
+        int status = ReadSysFile(sd.c_str(), std::ios_base::dec);
         if (status == 0)
             return i;
     }
@@ -671,12 +664,12 @@ bool VmBuilderQemu::BuildVmArgs(void) {
     if (!BuildEmulPath())
         return false;
 
+    if (!BuildNameQmp())
+        return false;
+
     BuildRpmbCmd();
 
     BuildAafCfg();
-
-    if (!BuildNameQmp())
-        return false;
 
     BuildNetCmd();
 
@@ -728,8 +721,24 @@ void VmBuilderQemu::SetProcessEnv(std::vector<std::string> env) {
     main_proc_->SetEnv(env);
 }
 
+void VmBuilderQemu::SetProcLogDir(void) {
+    time_t rawtime;
+    struct tm timeinfo;
+    char t_buf[80];
+    time(&rawtime);
+    localtime_r(&rawtime, &timeinfo);
+    strftime(t_buf, 80 , "%Y-%m-%d_%H%M%S", &timeinfo);
+    std::string dir("/tmp/" + name_ + "_" + t_buf);
+    main_proc_->SetLogDir(dir.c_str());
+    for (size_t i = 0; i < co_procs_.size(); ++i) {
+        co_procs_[i]->SetLogDir(dir.c_str());
+    }
+}
+
 void VmBuilderQemu::StartVm() {
     LOG(info) << "Emulator command:" << emul_cmd_;
+
+    SetProcLogDir();
 
     for (size_t i = 0; i < co_procs_.size(); ++i) {
         if (!co_procs_[i]->Running())
@@ -770,7 +779,6 @@ void VmBuilderQemu::PauseVm(void) {
 void VmBuilderQemu::WaitVmExit() {
     if (main_proc_) {
         main_proc_->Join();
-        //StopVm();
     }
 }
 
