@@ -81,7 +81,7 @@ static int GetGuestState(std::string name) {
             continue;
         if (sp[0].compare(name) == 0) {
             for (auto i = 0; i < VmBuilder::kVmUnknown; i++) {
-                if (sp[1].compare(kVmStateArr[i]) == 0) {
+                if (sp[1].compare(VmStateToStr(static_cast<VmBuilder::VmState>(i))) == 0) {
                     return i;
                 }
             }

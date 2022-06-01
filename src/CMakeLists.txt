@@ -26,7 +26,6 @@ project(${PROJECT_NAME})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-unused-variable -Wno-narrowing")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Wno-unused-variable -Wno-narrowing")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2 -g")
-message(${CMAKE_CXX_FLAGS_RELEASE})
 
 find_package(PkgConfig REQUIRED)
 include_directories(${DEPS_INCS_INCLUDE_DIRS})

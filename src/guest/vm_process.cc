@@ -20,7 +20,7 @@
 
 namespace vm_manager {
 
-void VmCoProcSimple::ThreadMon(void) {
+void VmProcSimple::ThreadMon(void) {
     std::error_code ec;
 
     time_t rawtime;
@@ -78,23 +78,23 @@ void VmCoProcSimple::ThreadMon(void) {
               << "\n\t\tlog: " << f_out;
 }
 
-void VmCoProcSimple::Run(void) {
+void VmProcSimple::Run(void) {
     mon_ = std::make_unique<boost::thread>([this] { ThreadMon(); });
     child_latch_.wait();
 }
 
-void VmCoProcSimple::Join(void) {
+void VmProcSimple::Join(void) {
     if (!mon_)
         return;
     if (mon_->joinable())
         mon_->join();
 }
 
-void VmCoProcSimple::SetEnv(std::vector<std::string> env) {
+void VmProcSimple::SetEnv(std::vector<std::string> env) {
     env_data_ = env;
 }
 
-void VmCoProcSimple::SetLogDir(const char *path) {
+void VmProcSimple::SetLogDir(const char *path) {
     if (!path)
         return;
 
@@ -110,7 +110,7 @@ void VmCoProcSimple::SetLogDir(const char *path) {
     log_dir_.assign(boost::filesystem::absolute(p).c_str()).append("/");
 }
 
-void VmCoProcSimple::Stop(void) {
+void VmProcSimple::Stop(void) {
     if (!mon_ || !c_)
         return;
 
@@ -126,13 +126,13 @@ void VmCoProcSimple::Stop(void) {
     mon_.reset(nullptr);
 }
 
-bool VmCoProcSimple::Running(void) {
+bool VmProcSimple::Running(void) {
     if (c_)
         return c_->running();
     return false;
 }
 
-VmCoProcSimple::~VmCoProcSimple() {
+VmProcSimple::~VmProcSimple() {
     Stop();
 }
 
@@ -147,11 +147,11 @@ void VmCoProcRpmb::Run(void) {
     }
     cmd_ = bin_ + " --dev " + data_dir_ + "/" + kRpmbData + " --sock " + data_dir_ + "/" + kRpmbSock;
 
-    VmCoProcSimple::Run();
+    VmProcSimple::Run();
 }
 
 void VmCoProcRpmb::Stop(void) {
-    VmCoProcSimple::Stop();
+    VmProcSimple::Stop();
 
     /* TODO: this temp rpmb sock file is created by rpmb_dev, but rpmb_dev did not cleanup
              when exit, so here check and remove the sock file after the rpmb_dev process
@@ -179,11 +179,11 @@ void VmCoProcVtpm::Run(void) {
     cmd_ = bin_ + " socket --tpmstate dir=" + data_dir_ +
            " --tpm2 --ctrl type=unixio,path=" + data_dir_ + "/" + kVtpmSock;
 
-    VmCoProcSimple::Run();
+    VmProcSimple::Run();
 }
 
 void VmCoProcVtpm::Stop(void) {
-    VmCoProcSimple::Stop();
+    VmProcSimple::Stop();
 }
 
 VmCoProcVtpm::~VmCoProcVtpm() {

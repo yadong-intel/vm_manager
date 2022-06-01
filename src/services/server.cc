@@ -116,7 +116,7 @@ int Server::ListVm(const char payload[]) {
                 (shm.get_segment_manager());
 
     for (size_t i = 0; i < vmis_.size(); ++i) {
-        std::string s(vmis_[i]->GetName() + ":" + kVmStateArr[vmis_[i]->GetState()]);
+        std::string s(vmis_[i]->GetName() + ":" + VmStateToStr(vmis_[i]->GetState()));
         vm_lists[i].assign(s.c_str());
     }
 

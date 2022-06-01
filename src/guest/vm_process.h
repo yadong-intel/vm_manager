@@ -36,20 +36,20 @@ class VmProcess {
     virtual ~VmProcess() = default;
 };
 
-class VmCoProcSimple : public VmProcess {
+class VmProcSimple : public VmProcess {
  public:
-    explicit VmCoProcSimple(std::string cmd) : cmd_(cmd), child_latch_(1) {}
+    explicit VmProcSimple(std::string cmd) : cmd_(cmd), child_latch_(1) {}
     void Run(void);
     void Stop(void);
     bool Running(void);
     void Join(void);
     void SetEnv(std::vector<std::string> env);
     void SetLogDir(const char *path);
-    virtual ~VmCoProcSimple();
+    virtual ~VmProcSimple();
 
  protected:
-    VmCoProcSimple(const VmCoProcSimple&) = delete;
-    VmCoProcSimple& operator=(const VmCoProcSimple&) = delete;
+    VmProcSimple(const VmProcSimple&) = delete;
+    VmProcSimple& operator=(const VmProcSimple&) = delete;
 
     void ThreadMon(void);
 
@@ -65,10 +65,10 @@ class VmCoProcSimple : public VmProcess {
     std::unique_ptr<boost::thread> mon_;
 };
 
-class VmCoProcRpmb : public VmCoProcSimple {
+class VmCoProcRpmb : public VmProcSimple {
  public:
     VmCoProcRpmb(std::string bin, std::string data_dir) :
-          VmCoProcSimple(""), bin_(bin), data_dir_(data_dir) {}
+          VmProcSimple(""), bin_(bin), data_dir_(data_dir) {}
 
     void Run(void);
     void Stop(void);
@@ -82,10 +82,10 @@ class VmCoProcRpmb : public VmCoProcSimple {
     std::string data_dir_;
 };
 
-class VmCoProcVtpm : public VmCoProcSimple {
+class VmCoProcVtpm : public VmProcSimple {
  public:
     VmCoProcVtpm(std::string bin, std::string data_dir) :
-          VmCoProcSimple(""), bin_(bin), data_dir_(data_dir) {}
+          VmProcSimple(""), bin_(bin), data_dir_(data_dir) {}
 
     void Run(void);
     void Stop(void);

@@ -57,25 +57,17 @@ class VmBuilder {
     std::mutex state_lock_;
 };
 
-#if 1
-inline constexpr const char *kVmStateArr[] = {
-    [VmBuilder::kVmEmpty] = "Empty",
-    [VmBuilder::kVmCreated] = "Created",
-    [VmBuilder::kVmBooting] = "Booting",
-    [VmBuilder::kVmRunning] = "Running",
-    [VmBuilder::kVmPaused] = "Paused",
-    [VmBuilder::kVmUnknown] = "Unknown",
-};
-#endif
+static inline constexpr const char *VmStateToStr(VmBuilder::VmState s) {
+    switch (s) {
+        case VmBuilder::kVmEmpty:   return "Empty";
+        case VmBuilder::kVmCreated: return "Created";
+        case VmBuilder::kVmBooting: return "Booting";
+        case VmBuilder::kVmRunning: return "Running";
+        case VmBuilder::kVmPaused:  return "Paused";
+        case VmBuilder::kVmUnknown: return "Unknown";
+    }
+}
 
-inline const std::map<VmBuilder::VmState, std::string> kVmStateMap = {
-    { VmBuilder::kVmEmpty, "Empty" },
-    { VmBuilder::kVmCreated, "Created" },
-    { VmBuilder::kVmBooting, "Booting" },
-    { VmBuilder::kVmRunning, "Running" },
-    { VmBuilder::kVmPaused, "Paused" },
-    { VmBuilder::kVmUnknown, "Unknown" }
-};
 
 }  // namespace vm_manager
 

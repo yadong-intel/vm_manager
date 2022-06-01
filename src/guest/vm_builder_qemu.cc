@@ -379,19 +379,19 @@ void VmBuilderQemu::RunMediationSrv(void) {
     std::string batt_med = cfg_.GetValue(kGroupMed, kMedBattery);
     if (batt_med.empty())
         return;
-    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(batt_med));
+    co_procs_.emplace_back(std::make_unique<VmProcSimple>(batt_med));
 
     std::string ther_med = cfg_.GetValue(kGroupMed, kMedThermal);
     if (ther_med.empty())
         return;
-    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(ther_med));
+    co_procs_.emplace_back(std::make_unique<VmProcSimple>(ther_med));
 }
 
 void VmBuilderQemu::BuildGuestTimeKeepCmd(void) {
     std::string tk = cfg_.GetValue(kGroupService, kServTimeKeep);
     if (tk.empty())
         return;
-    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(tk));
+    co_procs_.emplace_back(std::make_unique<VmProcSimple>(tk));
     emul_cmd_.append(" -qmp pipe:/tmp/qmp-time-keep-pipe");
 }
 
@@ -399,7 +399,7 @@ void VmBuilderQemu::BuildGuestPmCtrlCmd(void) {
     std::string pm = cfg_.GetValue(kGroupService, kServPmCtrl);
     if (pm.empty())
         return;
-    co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(pm));
+    co_procs_.emplace_back(std::make_unique<VmProcSimple>(pm));
     emul_cmd_.append(" -qmp unix:/tmp/qmp-pm-sock,server=on,wait=off -no-reboot");
 }
 
@@ -443,7 +443,7 @@ void VmBuilderQemu::SetExtraServices(void) {
         if (it->empty())
             continue;
 
-        co_procs_.emplace_back(std::make_unique<VmCoProcSimple>(*it));
+        co_procs_.emplace_back(std::make_unique<VmProcSimple>(*it));
     }
 }
 
@@ -710,7 +710,7 @@ bool VmBuilderQemu::BuildVmArgs(void) {
     if (aaf_cfg_)
         aaf_cfg_->Flush();
 
-    main_proc_ = std::make_unique<VmCoProcSimple>(emul_cmd_);
+    main_proc_ = std::make_unique<VmProcSimple>(emul_cmd_);
 
     state_ = VmBuilder::VmState::kVmCreated;
 
