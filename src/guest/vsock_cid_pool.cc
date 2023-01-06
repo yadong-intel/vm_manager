@@ -13,9 +13,9 @@ namespace vm_manager {
 uint32_t VsockCidPool::GetCid() {
     std::lock_guard<std::mutex> lock(mutex_);
     size_t pos = bs_._Find_next(kCiVCidStart - 1);
-    if (pos == bs_.size())
+    if (pos == bs_.size())  
         return 0;
-    bs_.reset(pos);
+    bs_.reset (pos);
     return pos;
 }
 
