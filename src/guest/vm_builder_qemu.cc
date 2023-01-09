@@ -974,7 +974,7 @@ void VmBuilderQemu::StopVm() {
 }
 
 VmBuilderQemu::~VmBuilderQemu() {
-    StopVm();
+    StopVm() ;
 }
 
 }  //  namespace vm_manager
