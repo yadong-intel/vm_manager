@@ -40,7 +40,7 @@ jobs:
       uses: github/codeql-action/init@v2
       with:
         languages: ${{ matrix.language }}
-        #queries: security-extended,security-and-quality
+        queries: security-extended,security-and-quality
 
     - run: |
        cd vm-manager/build/

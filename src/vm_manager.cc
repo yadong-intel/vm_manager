@@ -177,7 +177,7 @@ static bool StartServer(bool daemon) {
     LOG(info) << "Starting Server!";
     srv.Start();
 
-    return true;
+    exit(0);
 }
 
 static bool StopServer(void) {
@@ -246,14 +246,7 @@ class CivOptions final {
             return StartServer(daemon);
         } else {
             if (!IsServerRunning()) {
-                boost::filesystem::path cmd(argv[0]);
-                if (!boost::filesystem::exists(cmd)) {
-                    cmd.assign(boost::process::search_path(argv[0]));
-                }
-                if (boost::process::system(cmd, "--start-server", "--daemon")) {
-                    LOG(error) << "Failed to start server of vm-manager!";
-                    return false;
-                }
+                StartServer(true);
                 int wait_cnt = 0;
                 while (!IsServerRunning()) {
                     if (wait_cnt++ > 100) {
