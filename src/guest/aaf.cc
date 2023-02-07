@@ -43,13 +43,12 @@ void Aaf::Flush(void) {
     }
 
     std::string target_file(path_ + "/" + "mixins.spec");
-    std::ofstream out;
 
     if (boost::filesystem::exists(target_file)) {
         std::string hidden_file(path_ + "/" + ".mixins.spec~");
         boost::filesystem::rename(target_file, hidden_file, ec);
         std::ifstream in(hidden_file, std::ios::in);
-        out.open(target_file);
+        std::ofstream os(target_file);
         std::string tmp;
         LOG(info) << target_file;
         while (!in.eof()) {
@@ -60,28 +59,23 @@ void Aaf::Flush(void) {
 
             auto find = data_.find(key);
             if ((find != data_.end()) && !find->second.empty()) {
-                out << key << ":" << find->second << "\n";
+                os << key << ":" << find->second << "\n";
                 find->second.clear();
             } else {
-                out << tmp << "\n";
+                os << tmp << "\n";
             }
         }
         in.close();
         boost::filesystem::remove(hidden_file);
     }
 
-    if (!out.is_open()) {
-        out.open(target_file);
-    }
-
+    std::ofstream out(target_file);
     for (auto it = data_.begin(); it != data_.end(); it++) {
         if (!it->second.empty()) {
             out << it->first << ":" << it->second << "\n";
             it->second.clear();
         }
     }
-
-    out.close();
 }
 
 Aaf::Aaf(const char *path) : path_(path) {

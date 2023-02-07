@@ -90,7 +90,7 @@ bool Client::Notify(CivMsgType t) {
                 ();
 
     data->type = t;
-    strncpy(data->payload, client_shm_name_.c_str(), sizeof(data->payload));
+    strncpy(data->payload, client_shm_name_.c_str(), sizeof(data->payload) - 1);
 
     boost::interprocess::scoped_lock<boost::interprocess::interprocess_mutex> lock_cond(sync.first->mutex_cond);
     sync.first->cond_s.notify_one();
